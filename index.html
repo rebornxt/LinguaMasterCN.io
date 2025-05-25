@@ -1,1126 +1,1288 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>中文学习 - Chinese Learning App</title>
-  
-  <!-- Load React and ReactDOM from CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <!-- Load Babel for JSX transformation -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #f5f5f5;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    
-    /* Preload fonts */
-    @font-face {
-      font-family: 'Noto Serif SC';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url(https://fonts.gstatic.com/s/notoserifsc/v22/H4c8BXePl9DZ0Xe7gG9cyOj7mgq0SzZBEtERe7U.woff2) format('woff2');
-      unicode-range: U+4E00-9FFF;
-    }
-    
-    @font-face {
-      font-family: 'Noto Sans SC';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url(https://fonts.gstatic.com/s/notosanssc/v26/k3kIo84MPvpLmixcA63oeALZlaet9E3g-Lw.woff2) format('woff2');
-      unicode-range: U+4E00-9FFF;
-    }
-    
-    /* Hide scrollbar */
-    ::-webkit-scrollbar {
-      width: 0px;
-      background: transparent;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chinese Learning App</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <style>
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .chinese-text {
+            font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+        }
+        
+        .app-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        /* Main Container */
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            padding: 24px 32px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        /* Controls Section */
+        .controls-section {
+            padding: 24px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .upload-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .control-label {
+            font-weight: 600;
+            color: #4a5568;
+            min-width: 70px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 8px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            transform: translateY(-1px);
+        }
+        
+        .btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: #48bb78;
+            border-color: #48bb78;
+            color: white;
+        }
+        
+        .upload-btn:hover {
+            background: #38a169;
+            border-color: #38a169;
+            color: white;
+        }
+        
+        /* Learning Section */
+        .learning-section {
+            padding: 32px;
+            text-align: center;
+            min-height: 350px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+        
+        /* Progress Strip */
+        .progress-strip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #e2e8f0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.8s ease;
+        }
+        
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            position: relative;
+        }
+        
+        .stat-item {
+            text-align: center;
+            font-size: 12px;
+            color: #718096;
+            position: relative;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 2px;
+        }
+        
+        .message-tooltip {
+            position: absolute;
+            top: -35px;
+            right: -10px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            animation: fadeInMessage 0.3s ease-out;
+        }
+        
+        .message-tooltip.success {
+            color: #2f855a;
+            border-color: #9ae6b4;
+            background: #f0fff4;
+        }
+        
+        .message-tooltip.error {
+            color: #c53030;
+            border-color: #feb2b2;
+            background: #fffafa;
+        }
+        
+        .message-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            right: 20px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid white;
+        }
+        
+        .message-tooltip.success::after {
+            border-top-color: #f0fff4;
+        }
+        
+        .message-tooltip.error::after {
+            border-top-color: #fffafa;
+        }
+        
+        @keyframes fadeInMessage {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .question-text {
+            font-size: 56px;
+            margin-bottom: 12px;
+            color: #2d3748;
+            font-weight: 500;
+        }
+        
+        .question-pinyin {
+            font-size: 20px;
+            color: #718096;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        
+        .question-prompt {
+            font-size: 16px;
+            color: #4a5568;
+            margin-bottom: 24px;
+        }
+        
+        /* Quiz Options */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            max-width: 500px;
+            margin: 0 auto 24px;
+        }
+        
+        .option-btn {
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            color: #2d3748;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .option-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .option-btn.correct {
+            border-color: #48bb78;
+            background: #f0fff4;
+            color: #2f855a;
+        }
+        
+        .option-btn.incorrect {
+            border-color: #f56565;
+            background: #fffafa;
+            color: #c53030;
+        }
+        
+        /* Flashcard */
+        .flashcard {
+            min-height: 250px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .flashcard:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+        
+        .flashcard-back {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .flashcard-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-success {
+            background: #48bb78;
+            border-color: #48bb78;
+            color: white;
+            padding: 10px 20px;
+        }
+        
+        .btn-success:hover {
+            background: #38a169;
+            border-color: #38a169;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #f56565;
+            border-color: #f56565;
+            color: white;
+            padding: 10px 20px;
+        }
+        
+        .btn-danger:hover {
+            background: #e53e3e;
+            border-color: #e53e3e;
+            color: white;
+        }
+        
+        /* Navigation */
+        .navigation {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 12px;
+            align-items: center;
+            padding: 0 32px 24px;
+        }
+        
+        .nav-left {
+            justify-self: start;
+        }
+        
+        .nav-center {
+            justify-self: center;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .nav-right {
+            justify-self: end;
+        }
+        
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            border: 1px solid #e2e8f0;
+            border-radius: 50%;
+            background: white;
+            color: #4a5568;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            transform: translateY(-1px);
+        }
+        
+        /* Remove old message styles since we're not using them */
+        
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .loading-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Celebration */
+        .celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: celebrate 0.5s ease-out;
+        }
+        
+        @keyframes celebrate {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+        
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 12px;
+            }
+            
+            .controls-section {
+                padding: 20px 24px;
+            }
+            
+            .learning-section {
+                padding: 24px 20px;
+                min-height: 300px;
+            }
+            
+            .navigation {
+                padding: 0 20px 20px;
+            }
+            
+            .question-text {
+                font-size: 44px;
+            }
+            
+            .options-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+                max-width: 350px;
+            }
+            
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .control-label {
+                min-width: auto;
+                margin-bottom: 4px;
+                font-size: 13px;
+            }
+            
+            .stats-bar {
+                gap: 12px;
+            }
+            
+            .upload-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .message-tooltip {
+                right: -5px;
+                top: -32px;
+                font-size: 10px;
+                padding: 4px 8px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .app-container {
+                padding: 8px;
+            }
+            
+            .header {
+                padding: 20px 20px 16px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .header p {
+                font-size: 13px;
+            }
+            
+            .controls-section {
+                padding: 16px 20px;
+            }
+            
+            .learning-section {
+                padding: 20px 16px;
+            }
+            
+            .navigation {
+                padding: 0 16px 16px;
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+            
+            .question-text {
+                font-size: 36px;
+            }
+            
+            .question-pinyin {
+                font-size: 16px;
+            }
+            
+            .btn {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div id="root"></div>
-  
-  <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    <div id="root"></div>
     
-    function ChineseLearningApp() {
-      // State for vocabulary data
-      const [vocabularyData, setVocabularyData] = useState([]);
-      const [currentWordIndex, setCurrentWordIndex] = useState(0);
-      
-      // UI state
-      const [showSimplified, setShowSimplified] = useState(true);
-      const [showPinyin, setShowPinyin] = useState(false);
-      const [showEnglish, setShowEnglish] = useState(true);
-      const [autoAdvance, setAutoAdvance] = useState(false);
-      
-      // Quiz state
-      const [options, setOptions] = useState([]);
-      const [selectedOption, setSelectedOption] = useState(null);
-      const [isCorrect, setIsCorrect] = useState(null);
-      
-      // Message state
-      const [message, setMessage] = useState('');
-      const [messageType, setMessageType] = useState('info');
-      
-      // Scoring state
-      const [correctAnswers, setCorrectAnswers] = useState(0);
-      const [attemptedWords, setAttemptedWords] = useState(0);
-      
-      // Progress tracking
-      const [masteredWords, setMasteredWords] = useState({});
-
-      // Calculate mastery percentage
-      const getMasteryPercentage = () => {
-        if (vocabularyData.length === 0) return 0;
-        const masteredCount = Object.keys(masteredWords).length;
-        return Math.round((masteredCount / vocabularyData.length) * 100);
-      };
-
-      // Check if current word is mastered
-      const isCurrentWordMastered = () => {
-        if (!vocabularyData[currentWordIndex]) return false;
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
         
-        const currentWord = vocabularyData[currentWordIndex];
-        const wordKey = `${currentWord["Simplified Chinese"]}_${currentWord["Traditional Chinese"]}`;
-        
-        return !!masteredWords[wordKey];
-      };
-
-      // Generate options for the current word
-      const generateOptions = useCallback(() => {
-        if (!vocabularyData || vocabularyData.length === 0 || !vocabularyData[currentWordIndex]) {
-          setOptions([]);
-          return;
-        }
-        
-        const currentWord = vocabularyData[currentWordIndex];
-        const translationField = showEnglish ? "English" : "Thai";
-        
-        let correctAnswer = currentWord[translationField];
-        
-        if (!correctAnswer) {
-          correctAnswer = `[Missing ${translationField}]`;
-        }
-        
-        // Get 3 random unique wrong answers
-        const wrongAnswers = [];
-        const usedIndices = new Set([currentWordIndex]);
-        
-        // Try to get unique wrong answers
-        for (let attempts = 0; attempts < 30 && wrongAnswers.length < 3; attempts++) {
-          const randomIndex = Math.floor(Math.random() * vocabularyData.length);
-          if (!usedIndices.has(randomIndex) && 
-              vocabularyData[randomIndex] && 
-              vocabularyData[randomIndex][translationField] &&
-              vocabularyData[randomIndex][translationField] !== correctAnswer) {
-            usedIndices.add(randomIndex);
-            wrongAnswers.push(vocabularyData[randomIndex][translationField]);
-          }
-        }
-        
-        // If we don't have enough unique words, add placeholder options
-        while (wrongAnswers.length < 3) {
-          const placeholder = `Option ${wrongAnswers.length + 2}`;
-          if (!wrongAnswers.includes(placeholder) && placeholder !== correctAnswer) {
-            wrongAnswers.push(placeholder);
-          }
-        }
-        
-        // Combine correct and wrong answers, then shuffle
-        const allOptions = [correctAnswer, ...wrongAnswers];
-        const shuffledOptions = allOptions.sort(() => Math.random() - 0.5);
-        
-        setOptions(shuffledOptions);
-        setSelectedOption(null);
-        setIsCorrect(null);
-      }, [currentWordIndex, showEnglish, vocabularyData]);
-
-      // Handle option selection
-      const handleOptionSelect = (option) => {
-        if (!vocabularyData[currentWordIndex]) return;
-        
-        const currentWord = vocabularyData[currentWordIndex];
-        const translationField = showEnglish ? "English" : "Thai";
-        const correctAnswer = currentWord[translationField];
-        
-        setSelectedOption(option);
-        const correct = option === correctAnswer;
-        setIsCorrect(correct);
-        
-        // Only count the first attempt for this word in the session score
-        if (selectedOption === null) {
-          setAttemptedWords(prev => prev + 1);
-          if (correct) {
-            setCorrectAnswers(prev => prev + 1);
-          }
-        }
-        
-        // If correct, mark this word as mastered
-        if (correct) {
-          const wordKey = `${currentWord["Simplified Chinese"]}_${currentWord["Traditional Chinese"]}`;
-          
-          setMasteredWords(prev => ({
-            ...prev,
-            [wordKey]: true
-          }));
-        }
-        
-        // If correct and auto-advance is enabled, move to next word after delay
-        if (correct && autoAdvance) {
-          setTimeout(handleNextWord, 1000);
-        }
-      };
-
-      // Navigation functions
-      const handlePreviousWord = () => {
-        if (currentWordIndex > 0) {
-          setCurrentWordIndex(currentWordIndex - 1);
-        }
-      };
-
-      const handleNextWord = () => {
-        if (!vocabularyData.length) return;
-        
-        const canAdvance = isCorrect !== false;
-        
-        if (!canAdvance) {
-          showMessage("请选择正确的答案", 'error');
-          return;
-        }
-        
-        if (currentWordIndex < vocabularyData.length - 1) {
-          setCurrentWordIndex(currentWordIndex + 1);
-        } else {
-          setCurrentWordIndex(0);
-          showMessage("恭喜完成所有词汇！", 'success');
-        }
-      };
-
-      const resetProgress = () => {
-        if (vocabularyData.length === 0) {
-          showMessage('请先上传词汇', 'info');
-          return;
-        }
-        
-        const randomIndex = Math.floor(Math.random() * vocabularyData.length);
-        setCurrentWordIndex(randomIndex);
-        showMessage('已重置进度', 'info');
-        
-        setCorrectAnswers(0);
-        setAttemptedWords(0);
-      };
-
-      const clearAllProgress = () => {
-        if (confirm("确定要清除所有学习进度吗？")) {
-          setMasteredWords({});
-          setCorrectAnswers(0);
-          setAttemptedWords(0);
-          
-          showMessage('所有进度已清除', 'success');
-        }
-      };
-
-      const showMessage = (text, type = 'info', timeout = 3000) => {
-        setMessage(text);
-        setMessageType(type);
-        setTimeout(() => {
-          setMessage('');
-        }, timeout);
-      };
-
-      const practiceUnmasteredWords = () => {
-        if (vocabularyData.length === 0) {
-          showMessage('请先上传词汇', 'info');
-          return;
-        }
-        
-        const unmasteredIndices = [];
-        
-        vocabularyData.forEach((word, index) => {
-          const wordKey = `${word["Simplified Chinese"]}_${word["Traditional Chinese"]}`;
-          if (!masteredWords[wordKey]) {
-            unmasteredIndices.push(index);
-          }
-        });
-        
-        if (unmasteredIndices.length === 0) {
-          showMessage("恭喜！已掌握所有单词！", 'success');
-          return;
-        }
-        
-        const randomIndex = Math.floor(Math.random() * unmasteredIndices.length);
-        setCurrentWordIndex(unmasteredIndices[randomIndex]);
-        showMessage("显示未掌握的单词", 'info');
-      };
-
-      const getCurrentWordDisplay = () => {
-        if (!vocabularyData[currentWordIndex]) return "";
-        return showSimplified 
-          ? vocabularyData[currentWordIndex]["Simplified Chinese"]
-          : vocabularyData[currentWordIndex]["Traditional Chinese"];
-      };
-
-      const parseCSVLine = (line) => {
-        const values = [];
-        let inQuote = false;
-        let currentValue = '';
-        
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          
-          if (char === '"') {
-            inQuote = !inQuote;
-          } else if (char === ',' && !inQuote) {
-            values.push(currentValue.trim());
-            currentValue = '';
-          } else {
-            currentValue += char;
-          }
-        }
-        
-        values.push(currentValue.trim());
-        return values;
-      };
-
-      const parseCSV = (content) => {
-        const lines = content.split(/\r?\n/);
-        
-        if (lines.length <= 1) {
-          showMessage('CSV文件至少需要标题行和数据行', 'error');
-          return;
-        }
-        
-        const headers = parseCSVLine(lines[0]);
-        
-        const requiredHeaders = ["Simplified Chinese", "Traditional Chinese", "Pinyin", "English", "Thai"];
-        const headersLowerCase = headers.map(h => h.toLowerCase().trim());
-        const requiredHeadersLowerCase = requiredHeaders.map(h => h.toLowerCase().trim());
-        
-        const missingHeaders = [];
-        requiredHeadersLowerCase.forEach((required, index) => {
-          if (!headersLowerCase.includes(required)) {
-            missingHeaders.push(requiredHeaders[index]);
-          }
-        });
-        
-        if (missingHeaders.length > 0) {
-          showMessage(`缺少必要列: ${missingHeaders.join(', ')}`, 'error');
-          return;
-        }
-        
-        const headerMap = {};
-        headers.forEach((header, index) => {
-          const lowerHeader = header.toLowerCase().trim();
-          for (let i = 0; i < requiredHeadersLowerCase.length; i++) {
-            if (lowerHeader === requiredHeadersLowerCase[i]) {
-              headerMap[index] = requiredHeaders[i];
-              break;
-            }
-          }
-        });
-        
-        const parsedData = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line === '') continue;
-          
-          const values = parseCSVLine(line);
-          
-          const entry = {
-            "Simplified Chinese": "",
-            "Traditional Chinese": "",
-            "Pinyin": "",
-            "English": "",
-            "Thai": ""
-          };
-          let hasData = false;
-          
-          for (let colIndex = 0; colIndex < values.length; colIndex++) {
-            if (headerMap[colIndex]) {
-              const value = values[colIndex]?.trim() || '';
-              entry[headerMap[colIndex]] = value;
-              if (value) hasData = true;
-            }
-          }
-          
-          if (hasData) {
-            parsedData.push(entry);
-          }
-        }
-        
-        if (parsedData.length === 0) {
-          showMessage('未找到有效数据', 'error');
-          return;
-        }
-        
-        setVocabularyData(parsedData);
-        
-        const randomIndex = Math.floor(Math.random() * parsedData.length);
-        setCurrentWordIndex(randomIndex);
-        
-        showMessage(`成功加载 ${parsedData.length} 个词汇`, 'success');
-      };
-
-      const handleFileUpload = (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        
-        if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-          showMessage('请上传CSV文件', 'error');
-          return;
-        }
-        
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-          const content = e.target?.result;
-          
-          if (content.length < 10) {
-            showMessage('CSV文件为空', 'error');
-            return;
-          }
-          
-          setMasteredWords({});
-          setCorrectAnswers(0);
-          setAttemptedWords(0);
-          
-          parseCSV(content);
-        };
-        
-        reader.onerror = () => {
-          showMessage('读取文件失败', 'error');
-        };
-        
-        reader.readAsText(file);
-      };
-
-      const generateSampleCSV = () => {
-        const headers = "Simplified Chinese,Traditional Chinese,Pinyin,English,Thai";
-        const rows = [
-          "你好,你好,nǐ hǎo,hello,สวัสดี",
-          "谢谢,謝謝,xiè xiè,thank you,ขอบคุณ",
-          "再见,再見,zài jiàn,goodbye,ลาก่อน",
-          "对不起,對不起,duì bù qǐ,sorry,ขอโทษ",
-          "没关系,沒關係,méi guān xì,it's okay,ไม่เป็นไร",
-          "请,請,qǐng,please,กรุณา",
-          "是,是,shì,yes,ใช่",
-          "不是,不是,bú shì,no,ไม่ใช่",
-          "我,我,wǒ,I/me,ฉัน",
-          "你,你,nǐ,you,คุณ"
+        const sampleData = [
+            { simplified: '你好', traditional: '你好', pinyin: 'nǐ hǎo', english: 'hello', thai: 'สวัสดี' },
+            { simplified: '谢谢', traditional: '謝謝', pinyin: 'xiè xiè', english: 'thank you', thai: 'ขอบคุณ' },
+            { simplified: '再见', traditional: '再見', pinyin: 'zài jiàn', english: 'goodbye', thai: 'ลาก่อน' },
+            { simplified: '请', traditional: '請', pinyin: 'qǐng', english: 'please', thai: 'กรุณา' },
+            { simplified: '对不起', traditional: '對不起', pinyin: 'duì bù qǐ', english: 'sorry', thai: 'ขอโทษ' },
+            { simplified: '水', traditional: '水', pinyin: 'shuǐ', english: 'water', thai: 'น้ำ' },
+            { simplified: '吃', traditional: '吃', pinyin: 'chī', english: 'eat', thai: 'กิน' },
+            { simplified: '学习', traditional: '學習', pinyin: 'xué xí', english: 'study', thai: 'เรียน' },
         ];
-        
-        return `${headers}\n${rows.join('\n')}`;
-      };
 
-      const downloadSampleCSV = () => {
-        const csvContent = generateSampleCSV();
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'chinese_vocabulary_sample.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showMessage('示例文件已下载', 'success');
-      };
-
-      // Generate new options when current word or language changes
-      useEffect(() => {
-        generateOptions();
-      }, [currentWordIndex, showEnglish, vocabularyData, generateOptions]);
-
-      // Traditional Chinese styles
-      const styles = {
-        appContainer: {
-          maxWidth: 650,
-          margin: '0 auto',
-          backgroundImage: `linear-gradient(to bottom, #faf8f1 0%, #fef9f0 100%), url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,200 Q100,100 200,200 T400,200' stroke='%23ffdddd' stroke-width='0.5' fill='none' opacity='0.3'/%3E%3Cpath d='M0,200 Q100,300 200,200 T400,200' stroke='%23ffdddd' stroke-width='0.5' fill='none' opacity='0.3'/%3E%3C/svg%3E")`,
-          backgroundSize: 'cover, 100% 100%',
-          borderRadius: 0,
-          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.2)',
-          padding: 0,
-          border: '8px double #a52a2a',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-          position: 'relative',
-          overflow: 'hidden'
-        },
-        appHeader: {
-          textAlign: 'center',
-          marginBottom: 0,
-          padding: '30px 20px',
-          background: 'linear-gradient(180deg, #c41e3a 0%, #dc143c 50%, #c41e3a 100%)',
-          borderBottom: '3px solid #ffd700',
-          position: 'relative',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3) inset'
-        },
-        appTitle: {
-          color: '#ffffff',
-          fontSize: 28,
-          fontWeight: 800,
-          margin: 0,
-          fontFamily: '"Noto Serif SC", serif',
-          letterSpacing: 6,
-          textShadow: '2px 2px 4px rgba(0,0,0,0.5), -1px -1px 0 #ffd700',
-          transform: 'scaleY(1.1)'
-        },
-        subtitle: {
-          color: '#ffd700',
-          fontSize: 14,
-          marginTop: 8,
-          fontWeight: 500,
-          letterSpacing: 1,
-          textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
-        },
-        mainContent: {
-          padding: '30px 20px',
-          background: 'rgba(255,255,255,0.85)',
-          borderRadius: '8px',
-          margin: '20px',
-          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)'
-        },
-        notification: {
-          padding: 12,
-          borderRadius: 0,
-          marginBottom: 16,
-          fontSize: 14,
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          position: 'relative',
-          boxShadow: '0 3px 8px rgba(0,0,0,0.15)',
-          border: '3px double'
-        },
-        error: {
-          backgroundColor: '#fee',
-          color: '#8b0000',
-          borderColor: '#8b0000'
-        },
-        success: {
-          backgroundColor: '#e8f5e9',
-          color: '#1b5e20',
-          borderColor: '#2e7d32'
-        },
-        info: {
-          backgroundColor: '#ffe0b2',
-          color: '#e65100',
-          borderColor: '#ff6f00'
-        },
-        emptyState: {
-          textAlign: 'center',
-          padding: 60,
-          borderRadius: 0,
-          margin: '40px 20px',
-          backgroundColor: '#ffffff',
-          border: '6px double #c41e3a',
-          position: 'relative',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-          background: `radial-gradient(circle at center, rgba(255,215,0,0.1) 0%, transparent 50%), #ffffff`
-        },
-        controlRow: {
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 20,
-          flexWrap: 'wrap',
-          gap: 12,
-          padding: '0 10px'
-        },
-        toggleButton: {
-          padding: '8px 16px',
-          borderRadius: 0,
-          backgroundColor: '#ffffff',
-          color: '#8b0000',
-          fontWeight: 700,
-          border: '3px solid #c41e3a',
-          cursor: 'pointer',
-          fontSize: 14,
-          transition: 'all 0.2s',
-          minWidth: 90,
-          fontFamily: '"Noto Sans SC", Arial, sans-serif',
-          boxShadow: '3px 3px 0 rgba(196,30,58,0.3)',
-          transform: 'translate(-1px, -1px)'
-        },
-        toggleButtonActive: {
-          backgroundColor: '#c41e3a',
-          color: '#ffffff',
-          boxShadow: '2px 2px 0 rgba(196,30,58,0.3)',
-          transform: 'translate(0, 0)'
-        },
-        wordDisplay: {
-          backgroundColor: '#ffffff',
-          border: '4px solid #c41e3a',
-          borderRadius: 0,
-          padding: 30,
-          textAlign: 'center',
-          marginBottom: 24,
-          position: 'relative',
-          minHeight: 150,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
-          background: `repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 10px,
-            rgba(255,215,0,0.03) 10px,
-            rgba(255,215,0,0.03) 20px
-          ), #ffffff`
-        },
-        masteredBadge: {
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          backgroundColor: '#ffd700',
-          color: '#8b0000',
-          fontSize: 14,
-          padding: '6px 16px',
-          borderRadius: 0,
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          boxShadow: '0 3px 8px rgba(0,0,0,0.2)',
-          border: '2px solid #8b0000',
-          fontFamily: '"Noto Sans SC", Arial, sans-serif'
-        },
-        pinyin: {
-          fontSize: 16,
-          color: '#666666',
-          marginBottom: 8,
-          fontFamily: 'Arial, sans-serif',
-          letterSpacing: 0.5
-        },
-        chineseCharacter: {
-          fontSize: 44,
-          fontWeight: 800,
-          background: 'linear-gradient(180deg, #8b0000, #dc143c)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          margin: '12px 0',
-          lineHeight: 1,
-          fontFamily: '"Noto Serif SC", serif',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
-        },
-        optionButton: {
-          width: '100%',
-          padding: 14,
-          marginBottom: 10,
-          textAlign: 'center',
-          backgroundColor: '#ffffff',
-          border: '3px solid #c41e3a',
-          borderRadius: 0,
-          fontSize: 15,
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          fontWeight: 600,
-          fontFamily: 'Arial, sans-serif',
-          color: '#333333',
-          position: 'relative',
-          boxShadow: '3px 3px 0 rgba(196,30,58,0.2)'
-        },
-        optionButtonHover: {
-          transform: 'translate(-2px, -2px)',
-          boxShadow: '6px 6px 0 rgba(196,30,58,0.3)',
-          backgroundColor: '#fff5f5'
-        },
-        optionCorrect: {
-          border: '3px solid #2e7d32',
-          backgroundColor: '#e8f5e9',
-          color: '#1b5e20',
-          boxShadow: '4px 4px 0 rgba(46,125,50,0.3)'
-        },
-        optionIncorrect: {
-          border: '3px solid #d32f2f',
-          backgroundColor: '#ffebee',
-          color: '#c62828',
-          boxShadow: '4px 4px 0 rgba(211,47,47,0.3)'
-        },
-        navButton: {
-          padding: '10px 20px',
-          borderRadius: 0,
-          fontWeight: 700,
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          fontSize: 15,
-          minWidth: 100,
-          border: '3px solid',
-          fontFamily: '"Noto Sans SC", Arial, sans-serif',
-          boxShadow: '3px 3px 0 rgba(0,0,0,0.2)',
-          transform: 'translate(-1px, -1px)'
-        },
-        navButtonHover: {
-          transform: 'translate(0, 0)',
-          boxShadow: '2px 2px 0 rgba(0,0,0,0.2)'
-        },
-        navButtonPrimary: {
-          backgroundColor: '#c41e3a',
-          color: '#ffffff',
-          borderColor: '#8b0000'
-        },
-        navButtonSecondary: {
-          backgroundColor: '#ffd700',
-          color: '#8b0000',
-          borderColor: '#8b0000'
-        },
-        navButtonTertiary: {
-          backgroundColor: '#ffffff',
-          color: '#8b0000',
-          borderColor: '#c41e3a'
-        },
-        navButtonDisabled: {
-          opacity: 0.5,
-          cursor: 'not-allowed',
-          transform: 'none',
-          boxShadow: 'none'
-        },
-        progressBar: {
-          height: 8,
-          backgroundColor: '#f5f5f5',
-          borderRadius: 0,
-          overflow: 'hidden',
-          marginTop: 8,
-          marginBottom: 16,
-          border: '2px solid #c41e3a',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
-        },
-        progressBarInner: {
-          height: '100%',
-          background: 'linear-gradient(90deg, #c41e3a 0%, #dc143c 50%, #c41e3a 100%)',
-          borderRadius: 0,
-          transition: 'width 0.3s ease',
-          position: 'relative',
-          boxShadow: 'inset 0 -2px 4px rgba(0,0,0,0.2)'
-        },
-        progressContainer: {
-          backgroundColor: '#ffffff',
-          borderRadius: 0,
-          padding: 24,
-          marginTop: 30,
-          border: '3px solid #c41e3a',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-          position: 'relative'
-        },
-        sectionTitle: {
-          fontSize: 16,
-          fontWeight: 700,
-          color: '#8b0000',
-          marginBottom: 10,
-          fontFamily: '"Noto Sans SC", Arial, sans-serif',
-          letterSpacing: 0.5
-        },
-        progressText: {
-          fontSize: 14,
-          color: '#424242',
-          marginBottom: 0,
-          fontFamily: 'Arial, sans-serif'
-        },
-        fileUploadSection: {
-          marginTop: 30,
-          padding: '30px 20px',
-          background: 'linear-gradient(180deg, #fff5f5 0%, #ffe0e0 100%)',
-          borderTop: '3px solid #c41e3a',
-          borderBottom: '3px solid #c41e3a'
-        },
-        uploadButton: {
-          display: 'block',
-          width: '100%',
-          padding: 18,
-          backgroundColor: '#ffffff',
-          border: '4px dashed #c41e3a',
-          borderRadius: 0,
-          textAlign: 'center',
-          cursor: 'pointer',
-          fontSize: 16,
-          fontWeight: 700,
-          color: '#8b0000',
-          transition: 'all 0.2s',
-          marginBottom: 14,
-          fontFamily: '"Noto Sans SC", Arial, sans-serif',
-          boxShadow: '0 3px 8px rgba(0,0,0,0.1)'
-        },
-        uploadButtonHover: {
-          backgroundColor: '#fff5f5',
-          borderColor: '#8b0000',
-          transform: 'scale(1.02)'
-        },
-        link: {
-          color: '#c41e3a',
-          textDecoration: 'none',
-          fontSize: 14,
-          fontWeight: 700,
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          fontFamily: '"Noto Sans SC", Arial, sans-serif'
-        },
-        linkHover: {
-          color: '#8b0000',
-          textDecoration: 'underline'
-        },
-        cornerDecoration: {
-          position: 'absolute',
-          width: 60,
-          height: 60,
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10,50 Q50,10 90,50 Q50,90 10,50' fill='none' stroke='%23ffd700' stroke-width='3'/%3E%3C/svg%3E")`,
-          backgroundSize: 'contain',
-          opacity: 0.8
-        },
-        topLeftCorner: {
-          top: 10,
-          left: 10
-        },
-        topRightCorner: {
-          top: 10,
-          right: 10,
-          transform: 'rotate(90deg)'
-        },
-        bottomLeftCorner: {
-          bottom: 10,
-          left: 10,
-          transform: 'rotate(-90deg)'
-        },
-        bottomRightCorner: {
-          bottom: 10,
-          right: 10,
-          transform: 'rotate(180deg)'
-        }
-      };
-
-      const getNotificationStyle = () => {
-        if (messageType === 'error') {
-          return { ...styles.notification, ...styles.error };
-        } else if (messageType === 'success') {
-          return { ...styles.notification, ...styles.success };
-        }
-        return { ...styles.notification, ...styles.info };
-      };
-
-      const getOptionStyle = (option) => {
-        if (selectedOption !== option) {
-          return styles.optionButton;
-        }
-        
-        if (isCorrect) {
-          return { ...styles.optionButton, ...styles.optionCorrect };
-        } else {
-          return { ...styles.optionButton, ...styles.optionIncorrect };
-        }
-      };
-
-      return (
-        <div style={styles.appContainer}>
-          <div style={styles.appHeader}>
-            <h1 style={styles.appTitle}>中文学习</h1>
-            <p style={styles.subtitle}>汉语学习应用程序</p>
-            <div style={{...styles.cornerDecoration, ...styles.topLeftCorner}}></div>
-            <div style={{...styles.cornerDecoration, ...styles.topRightCorner}}></div>
-          </div>
-          
-          <div style={styles.mainContent}>
-            {message && (
-              <div style={getNotificationStyle()}>
-                {message}
-              </div>
-            )}
+        const ChineseLearningApp = () => {
+            // Core state
+            const [vocabulary, setVocabulary] = useState(sampleData);
+            const [shuffledIndices, setShuffledIndices] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
+            const [masteredWords, setMasteredWords] = useState(new Set());
+            const [unlearnDeck, setUnlearnDeck] = useState(new Set());
+            const [studyDeck, setStudyDeck] = useState('all');
+            const [streak, setStreak] = useState(0);
+            const [bestStreak, setBestStreak] = useState(0);
+            const [totalAnswered, setTotalAnswered] = useState(0);
             
-            {vocabularyData.length === 0 && (
-              <div style={styles.emptyState}>
-                <h2 style={{ fontSize: 24, color: '#c41e3a', marginBottom: 12, fontFamily: '"Noto Serif SC", serif' }}>欢迎光临</h2>
-                <p style={{ fontSize: 16, color: '#666666', marginBottom: 6 }}>Welcome!</p>
-                <p style={{ fontSize: 15, marginTop: 16, fontWeight: 600 }}>请上传CSV词汇文件开始学习</p>
-                <p style={{ fontSize: 14, color: '#999999' }}>Please upload a CSV file to start learning</p>
-                <div style={{...styles.cornerDecoration, ...styles.bottomLeftCorner}}></div>
-                <div style={{...styles.cornerDecoration, ...styles.bottomRightCorner}}></div>
-              </div>
-            )}
+            // UI state
+            const [mode, setMode] = useState('quiz');
+            const [showTraditional, setShowTraditional] = useState(false);
+            const [showPinyin, setShowPinyin] = useState(true);
+            const [useEnglish, setUseEnglish] = useState(true);
+            const [autoAdvance, setAutoAdvance] = useState(false);
+            const [showAnswer, setShowAnswer] = useState(false);
+            const [selectedOption, setSelectedOption] = useState(null);
+            const [options, setOptions] = useState([]);
+            const [message, setMessage] = useState('');
+            const [messageType, setMessageType] = useState('');
+            const [cardFlipped, setCardFlipped] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [showCelebration, setShowCelebration] = useState(false);
             
-            {vocabularyData.length > 0 && (
-              <>
-                <div style={styles.controlRow}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button 
-                      onClick={() => setShowSimplified(!showSimplified)}
-                      style={{...styles.toggleButton, ...(showSimplified ? styles.toggleButtonActive : {})}}
-                    >
-                      {showSimplified ? "简体" : "繁体"}
-                    </button>
-                  </div>
-                  
-                  <div>
-                    <button 
-                      onClick={() => setShowPinyin(!showPinyin)}
-                      style={{...styles.toggleButton, ...(showPinyin ? styles.toggleButtonActive : {})}}
-                    >
-                      拼音{showPinyin ? " 开" : " 关"}
-                    </button>
-                  </div>
-                  
-                  <div>
-                    <button 
-                      onClick={() => setShowEnglish(!showEnglish)}
-                      style={styles.toggleButton}
-                    >
-                      {showEnglish ? "英文" : "泰文"}
-                    </button>
-                  </div>
-                </div>
+            // Shuffle function
+            const shuffleArray = (array) => {
+                const shuffled = [...array];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+            };
+            
+            // Initialize shuffled indices
+            useEffect(() => {
+                if (vocabulary.length > 0) {
+                    const indices = Array.from({ length: vocabulary.length }, (_, i) => i);
+                    setShuffledIndices(shuffleArray(indices));
+                }
+            }, [vocabulary]);
+            
+            // Get current study vocabulary
+            const getCurrentVocabulary = useCallback(() => {
+                if (studyDeck === 'unlearn') {
+                    const unlearnIndices = Array.from(unlearnDeck);
+                    return unlearnIndices.map(index => vocabulary[index]).filter(Boolean);
+                }
+                return shuffledIndices.map(index => vocabulary[index]).filter(Boolean);
+            }, [vocabulary, studyDeck, unlearnDeck, shuffledIndices]);
+            
+            // Generate quiz options
+            const generateOptions = useCallback(() => {
+                const currentVocab = getCurrentVocabulary();
+                if (currentVocab.length === 0) return [];
                 
-                <div style={styles.wordDisplay}>
-                  {isCurrentWordMastered() && (
-                    <div style={styles.masteredBadge}>
-                      ✓ 已掌握
+                const currentWord = currentVocab[currentIndex];
+                const correctAnswer = useEnglish ? currentWord.english : currentWord.thai;
+                
+                const incorrectOptions = vocabulary
+                    .filter(word => (useEnglish ? word.english : word.thai) !== correctAnswer)
+                    .map(word => useEnglish ? word.english : word.thai)
+                    .sort(() => Math.random() - 0.5)
+                    .slice(0, 3);
+                
+                const allOptions = [correctAnswer, ...incorrectOptions]
+                    .sort(() => Math.random() - 0.5);
+                
+                return allOptions;
+            }, [getCurrentVocabulary, currentIndex, useEnglish, vocabulary]);
+            
+            // Initialize options when dependencies change
+            useEffect(() => {
+                if (mode === 'quiz') {
+                    setOptions(generateOptions());
+                    setSelectedOption(null);
+                    setShowAnswer(false);
+                }
+                setCardFlipped(false);
+            }, [generateOptions, mode]);
+            
+            // Handle quiz answer selection
+            const handleAnswerSelect = (selectedAnswer) => {
+                if (selectedOption !== null) return;
+                
+                const currentVocab = getCurrentVocabulary();
+                const currentWord = currentVocab[currentIndex];
+                const correctAnswer = useEnglish ? currentWord.english : currentWord.thai;
+                const isCorrect = selectedAnswer === correctAnswer;
+                
+                const originalIndex = vocabulary.findIndex(word => 
+                    word.simplified === currentWord.simplified && 
+                    word.traditional === currentWord.traditional
+                );
+                
+                setSelectedOption(selectedAnswer);
+                setShowAnswer(true);
+                setAnsweredQuestions(prev => new Set([...prev, originalIndex]));
+                setTotalAnswered(prev => prev + 1);
+                
+                if (isCorrect) {
+                    setScore(prev => prev + 1);
+                    setStreak(prev => {
+                        const newStreak = prev + 1;
+                        if (newStreak > bestStreak) {
+                            setBestStreak(newStreak);
+                            if (newStreak >= 5 && newStreak % 5 === 0) {
+                                setShowCelebration(true);
+                                setTimeout(() => setShowCelebration(false), 2000);
+                            }
+                        }
+                        return newStreak;
+                    });
+                    setMasteredWords(prev => new Set([...prev, originalIndex]));
+                    
+                    if (studyDeck === 'unlearn') {
+                        setUnlearnDeck(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(originalIndex);
+                            return newSet;
+                        });
+                        setMessage('Correct! Removed from review deck');
+                    } else {
+                        setMessage('Correct!');
+                    }
+                    setMessageType('success');
+                } else {
+                    setStreak(0);
+                    setUnlearnDeck(prev => new Set([...prev, originalIndex]));
+                    setMessage('Incorrect - Added to review deck');
+                    setMessageType('error');
+                }
+                
+                if (autoAdvance) {
+                    setTimeout(() => {
+                        handleNext();
+                    }, 1500);
+                }
+                
+                setTimeout(() => {
+                    setMessage('');
+                    setMessageType('');
+                }, 3000);
+            };
+            
+            // Flashcard interaction handlers
+            const handleRemembered = () => {
+                const currentVocab = getCurrentVocabulary();
+                const currentWord = currentVocab[currentIndex];
+                const originalIndex = vocabulary.findIndex(word => 
+                    word.simplified === currentWord.simplified && 
+                    word.traditional === currentWord.traditional
+                );
+                
+                setMasteredWords(prev => new Set([...prev, originalIndex]));
+                setScore(prev => prev + 1);
+                setTotalAnswered(prev => prev + 1);
+                setStreak(prev => {
+                    const newStreak = prev + 1;
+                    if (newStreak > bestStreak) {
+                        setBestStreak(newStreak);
+                        if (newStreak >= 5 && newStreak % 5 === 0) {
+                            setShowCelebration(true);
+                            setTimeout(() => setShowCelebration(false), 2000);
+                        }
+                    }
+                    return newStreak;
+                });
+                
+                if (studyDeck === 'unlearn') {
+                    setUnlearnDeck(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(originalIndex);
+                        return newSet;
+                    });
+                    setMessage('Remembered! Removed from review deck');
+                } else {
+                    setMessage('Remembered!');
+                }
+                setMessageType('success');
+                setCardFlipped(false);
+                
+                setTimeout(() => {
+                    setMessage('');
+                    setMessageType('');
+                    handleNext();
+                }, 1000);
+            };
+            
+            const handleReviewAgain = () => {
+                const currentVocab = getCurrentVocabulary();
+                const currentWord = currentVocab[currentIndex];
+                const originalIndex = vocabulary.findIndex(word => 
+                    word.simplified === currentWord.simplified && 
+                    word.traditional === currentWord.traditional
+                );
+                
+                setStreak(0);
+                setTotalAnswered(prev => prev + 1);
+                setUnlearnDeck(prev => new Set([...prev, originalIndex]));
+                setMessage('Added to review deck');
+                setMessageType('error');
+                setCardFlipped(false);
+                
+                setTimeout(() => {
+                    setMessage('');
+                    setMessageType('');
+                    handleNext();
+                }, 1000);
+            };
+            
+            // Navigation functions
+            const handleNext = () => {
+                const currentVocab = getCurrentVocabulary();
+                if (currentVocab.length === 0) return;
+                setCurrentIndex(prev => (prev + 1) % currentVocab.length);
+            };
+            
+            const handlePrevious = () => {
+                const currentVocab = getCurrentVocabulary();
+                if (currentVocab.length === 0) return;
+                setCurrentIndex(prev => prev === 0 ? currentVocab.length - 1 : prev - 1);
+            };
+            
+            const handleReset = () => {
+                setCurrentIndex(0);
+                setScore(0);
+                setAnsweredQuestions(new Set());
+                setSelectedOption(null);
+                setShowAnswer(false);
+                setCardFlipped(false);
+                setMessage('');
+                setMessageType('');
+                setStreak(0);
+                setTotalAnswered(0);
+                
+                if (vocabulary.length > 0) {
+                    const indices = Array.from({ length: vocabulary.length }, (_, i) => i);
+                    setShuffledIndices(shuffleArray(indices));
+                }
+            };
+            
+            const handleFullReset = () => {
+                handleReset();
+                setMasteredWords(new Set());
+                setUnlearnDeck(new Set());
+                setStudyDeck('all');
+                setBestStreak(0);
+                
+                if (vocabulary.length > 0) {
+                    const indices = Array.from({ length: vocabulary.length }, (_, i) => i);
+                    setShuffledIndices(shuffleArray(indices));
+                }
+            };
+            
+            // File handling
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                setIsLoading(true);
+                
+                if (file.type !== 'text/csv' && !file.name.toLowerCase().endsWith('.csv')) {
+                    setMessage('Please select a valid CSV file');
+                    setMessageType('error');
+                    setIsLoading(false);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onerror = () => {
+                    setMessage('Error reading file');
+                    setMessageType('error');
+                    setIsLoading(false);
+                };
+                
+                reader.onload = (e) => {
+                    try {
+                        const text = e.target.result;
+                        const lines = text.split(/\r?\n/).filter(line => line.trim());
+                        
+                        if (lines.length < 2) {
+                            setMessage('CSV file must have at least a header row and one data row');
+                            setMessageType('error');
+                            setIsLoading(false);
+                            return;
+                        }
+                        
+                        const parseCSVLine = (line) => {
+                            const result = [];
+                            let current = '';
+                            let inQuotes = false;
+                            
+                            for (let i = 0; i < line.length; i++) {
+                                const char = line[i];
+                                
+                                if (char === '"') {
+                                    inQuotes = !inQuotes;
+                                } else if (char === ',' && !inQuotes) {
+                                    result.push(current.trim());
+                                    current = '';
+                                } else {
+                                    current += char;
+                                }
+                            }
+                            result.push(current.trim());
+                            return result.map(field => field.replace(/^"(.*)"$/, '$1'));
+                        };
+                        
+                        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+                        const requiredHeaders = ['simplified', 'traditional', 'pinyin', 'english', 'thai'];
+                        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+                        
+                        if (missingHeaders.length > 0) {
+                            setMessage(`Missing required columns: ${missingHeaders.join(', ')}`);
+                            setMessageType('error');
+                            setIsLoading(false);
+                            return;
+                        }
+                        
+                        const data = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = parseCSVLine(lines[i]);
+                            const row = {};
+                            
+                            headers.forEach((header, index) => {
+                                row[header] = values[index] ? values[index].trim() : '';
+                            });
+                            
+                            if (row.simplified && row.english) {
+                                data.push(row);
+                            }
+                        }
+                        
+                        if (data.length === 0) {
+                            setMessage('No valid vocabulary entries found in CSV');
+                            setMessageType('error');
+                            setIsLoading(false);
+                            return;
+                        }
+                        
+                        setVocabulary(data);
+                        handleFullReset();
+                        setMessage(`Successfully loaded ${data.length} vocabulary entries!`);
+                        setMessageType('success');
+                        
+                        setTimeout(() => {
+                            const indices = Array.from({ length: data.length }, (_, i) => i);
+                            setShuffledIndices(shuffleArray(indices));
+                            setIsLoading(false);
+                        }, 100);
+                        
+                    } catch (error) {
+                        setMessage(`Error parsing CSV file: ${error.message}`);
+                        setMessageType('error');
+                        setIsLoading(false);
+                    }
+                };
+                
+                reader.readAsText(file, 'UTF-8');
+                event.target.value = '';
+            };
+            
+            // Calculated values
+            const currentVocab = getCurrentVocabulary();
+            const currentWord = currentVocab[currentIndex] || {};
+            const displayedChinese = showTraditional ? currentWord.traditional : currentWord.simplified;
+            const masteryPercentage = vocabulary.length > 0 ? Math.round((masteredWords.size / vocabulary.length) * 100) : 0;
+            const accuracy = totalAnswered > 0 ? Math.round((score / totalAnswered) * 100) : 0;
+            
+            return (
+                <div className="app-container">
+                    <div className="main-container">
+                        {/* Header */}
+                        <div className="header">
+                            <h1>Chinese Learning App 中文学习应用</h1>
+                            <p>Learn Chinese vocabulary with interactive flashcards and quizzes</p>
+                        </div>
+                        
+                        {/* Controls Section */}
+                        <div className="controls-section">
+                            <div className="upload-row">
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleFileUpload}
+                                    className="file-input"
+                                    id="csvFileInput"
+                                    disabled={isLoading}
+                                />
+                                <label htmlFor="csvFileInput" className="btn upload-btn" style={{cursor: isLoading ? 'not-allowed' : 'pointer'}}>
+                                    📁 {isLoading ? 'Uploading...' : 'Upload CSV'}
+                                </label>
+                            </div>
+                            
+                            <div className="control-row">
+                                <span className="control-label">Study:</span>
+                                <div className="btn-group">
+                                    <button 
+                                        className={`btn ${studyDeck === 'all' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setStudyDeck('all');
+                                            setCurrentIndex(0);
+                                            setSelectedOption(null);
+                                            setShowAnswer(false);
+                                            setCardFlipped(false);
+                                        }}
+                                    >
+                                        All Words ({vocabulary.length})
+                                    </button>
+                                    <button 
+                                        className={`btn ${studyDeck === 'unlearn' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setStudyDeck('unlearn');
+                                            setCurrentIndex(0);
+                                            setSelectedOption(null);
+                                            setShowAnswer(false);
+                                            setCardFlipped(false);
+                                        }}
+                                        disabled={unlearnDeck.size === 0}
+                                    >
+                                        Review Deck ({unlearnDeck.size})
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="control-row">
+                                <span className="control-label">Mode:</span>
+                                <div className="btn-group">
+                                    <button 
+                                        className={`btn ${mode === 'quiz' ? 'active' : ''}`}
+                                        onClick={() => setMode('quiz')}
+                                    >
+                                        Quiz
+                                    </button>
+                                    <button 
+                                        className={`btn ${mode === 'flashcard' ? 'active' : ''}`}
+                                        onClick={() => setMode('flashcard')}
+                                    >
+                                        Flashcard
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="control-row">
+                                <span className="control-label">Options:</span>
+                                <div className="btn-group">
+                                    <button 
+                                        className={`btn ${showTraditional ? 'active' : ''}`}
+                                        onClick={() => setShowTraditional(!showTraditional)}
+                                    >
+                                        {showTraditional ? 'Traditional' : 'Simplified'}
+                                    </button>
+                                    <button 
+                                        className={`btn ${showPinyin ? 'active' : ''}`}
+                                        onClick={() => setShowPinyin(!showPinyin)}
+                                    >
+                                        {showPinyin ? 'Hide Pinyin' : 'Show Pinyin'}
+                                    </button>
+                                    <button 
+                                        className={`btn ${useEnglish ? 'active' : ''}`}
+                                        onClick={() => setUseEnglish(!useEnglish)}
+                                    >
+                                        {useEnglish ? 'English' : 'Thai'}
+                                    </button>
+                                    <button 
+                                        className={`btn ${autoAdvance ? 'active' : ''}`}
+                                        onClick={() => setAutoAdvance(!autoAdvance)}
+                                    >
+                                        Auto Advance
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Learning Section */}
+                        {currentVocab.length > 0 ? (
+                            <div className="learning-section">
+                                <div className="progress-strip">
+                                    <div className="progress-fill" style={{width: `${masteryPercentage}%`}}></div>
+                                </div>
+                                
+                                <div className="stats-bar">
+                                    <div className="stat-item">
+                                        <div className="stat-value">{score}</div>
+                                        <div>Correct</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-value">{accuracy}%</div>
+                                        <div>Accuracy</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-value">{streak}🔥</div>
+                                        <div>Streak</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-value">{masteredWords.size}</div>
+                                        <div>Mastered</div>
+                                        {message && (
+                                            <div className={`message-tooltip ${messageType}`}>
+                                                {message}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {mode === 'quiz' ? (
+                                    <>
+                                        <div className="question-text chinese-text">
+                                            {displayedChinese}
+                                        </div>
+                                        {showPinyin && (
+                                            <div className="question-pinyin">
+                                                {currentWord.pinyin}
+                                            </div>
+                                        )}
+                                        <div className="question-prompt">
+                                            Select the {useEnglish ? 'English' : 'Thai'} translation:
+                                        </div>
+                                        
+                                        <div className="options-grid">
+                                            {options.map((option, index) => {
+                                                const correctAnswer = useEnglish ? currentWord.english : currentWord.thai;
+                                                const isCorrect = option === correctAnswer;
+                                                const isSelected = selectedOption === option;
+                                                
+                                                let className = 'option-btn';
+                                                if (showAnswer && isSelected) {
+                                                    className += isCorrect ? ' correct' : ' incorrect';
+                                                } else if (showAnswer && isCorrect) {
+                                                    className += ' correct';
+                                                }
+                                                
+                                                return (
+                                                    <button
+                                                        key={index}
+                                                        className={className}
+                                                        onClick={() => handleAnswerSelect(option)}
+                                                        disabled={selectedOption !== null}
+                                                    >
+                                                        {option}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div 
+                                        className="flashcard"
+                                        onClick={() => setCardFlipped(!cardFlipped)}
+                                    >
+                                        {!cardFlipped ? (
+                                            <div>
+                                                <div className="question-text chinese-text">
+                                                    {displayedChinese}
+                                                </div>
+                                                {showPinyin && (
+                                                    <div className="question-pinyin">
+                                                        {currentWord.pinyin}
+                                                    </div>
+                                                )}
+                                                <div className="question-prompt">
+                                                    Click to reveal translation
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flashcard-back">
+                                                <div>
+                                                    <div className="question-text chinese-text" style={{fontSize: '40px'}}>
+                                                        {displayedChinese}
+                                                    </div>
+                                                    <div className="question-pinyin">
+                                                        {currentWord.pinyin}
+                                                    </div>
+                                                    <div style={{fontSize: '18px', color: '#2d3748', fontWeight: '500'}}>
+                                                        {useEnglish ? currentWord.english : currentWord.thai}
+                                                    </div>
+                                                </div>
+                                                <div className="flashcard-buttons">
+                                                    <button 
+                                                        className="btn btn-danger"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleReviewAgain();
+                                                        }}
+                                                    >
+                                                        Review Again
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-success"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemembered();
+                                                        }}
+                                                    >
+                                                        ✓ Remembered
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : vocabulary.length > 0 ? (
+                            <div className="learning-section">
+                                <div className="empty-state">
+                                    <h3>Review Deck is Empty!</h3>
+                                    <p>Great job! Switch back to "All Words" to continue learning.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="learning-section">
+                                <div className="empty-state">
+                                    <h3>Welcome!</h3>
+                                    <p>Upload your vocabulary CSV file or download the template to get started.</p>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Navigation */}
+                        {currentVocab.length > 0 && (
+                            <div className="navigation">
+                                <div className="nav-left">
+                                    <button className="nav-btn" onClick={handlePrevious} title="Previous">
+                                        ←
+                                    </button>
+                                </div>
+                                <div className="nav-center">
+                                    <button className="nav-btn" onClick={handleReset} title="Reset">
+                                        ↻
+                                    </button>
+                                    <button className="nav-btn" onClick={handleFullReset} title="Full Reset">
+                                        🗑
+                                    </button>
+                                </div>
+                                <div className="nav-right">
+                                    <button className="nav-btn" onClick={handleNext} title="Next">
+                                        →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                  )}
-                  
-                  {showPinyin && vocabularyData[currentWordIndex] && (
-                    <p style={styles.pinyin}>
-                      {vocabularyData[currentWordIndex]["Pinyin"]}
-                    </p>
-                  )}
-                  <h2 style={styles.chineseCharacter}>{getCurrentWordDisplay()}</h2>
+                    
+                    {/* Loading Overlay */}
+                    {isLoading && (
+                        <div className="loading-overlay">
+                            <div className="loading-content">
+                                <div className="spinner"></div>
+                                <div>Processing CSV file...</div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Celebration */}
+                    {showCelebration && (
+                        <div className="celebration">
+                            <h2>🎉 Great Job!</h2>
+                            <p>{bestStreak} correct answers in a row!</p>
+                        </div>
+                    )}
                 </div>
-                
-                <div style={{ marginBottom: 28 }}>
-                  <p style={{ fontSize: 16, textAlign: 'center', marginBottom: 14, color: '#8b0000', fontWeight: 700 }}>
-                    请选择正确的{showEnglish ? "英文" : "泰文"}翻译
-                  </p>
-                  <div>
-                    {options.map((option, index) => (
-                      <button 
-                        key={index}
-                        onClick={() => handleOptionSelect(option)}
-                        style={getOptionStyle(option)}
-                        onMouseEnter={(e) => {
-                          if (selectedOption !== option) {
-                            e.target.style.transform = 'translate(-2px, -2px)';
-                            e.target.style.boxShadow = '6px 6px 0 rgba(196,30,58,0.3)';
-                            e.target.style.backgroundColor = '#fff5f5';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedOption !== option) {
-                            e.target.style.transform = 'none';
-                            e.target.style.boxShadow = '3px 3px 0 rgba(196,30,58,0.2)';
-                            e.target.style.backgroundColor = '#ffffff';
-                          }
-                        }}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div style={styles.controlRow}>
-                  <button 
-                    onClick={handlePreviousWord}
-                    style={{ ...styles.navButton, ...styles.navButtonTertiary }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translate(0, 0)';
-                      e.target.style.boxShadow = '2px 2px 0 rgba(0,0,0,0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translate(-1px, -1px)';
-                      e.target.style.boxShadow = '3px 3px 0 rgba(0,0,0,0.2)';
-                    }}
-                  >
-                    上一个
-                  </button>
-                  
-                  <button 
-                    onClick={resetProgress}
-                    style={{ ...styles.navButton, ...styles.navButtonSecondary }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translate(0, 0)';
-                      e.target.style.boxShadow = '2px 2px 0 rgba(0,0,0,0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translate(-1px, -1px)';
-                      e.target.style.boxShadow = '3px 3px 0 rgba(0,0,0,0.2)';
-                    }}
-                  >
-                    重置
-                  </button>
-                  
-                  <button 
-                    onClick={handleNextWord}
-                    style={{ 
-                      ...styles.navButton, 
-                      ...styles.navButtonPrimary,
-                      ...(isCorrect === false ? styles.navButtonDisabled : {})
-                    }}
-                    disabled={isCorrect === false}
-                    onMouseEnter={(e) => {
-                      if (isCorrect !== false) {
-                        e.target.style.transform = 'translate(0, 0)';
-                        e.target.style.boxShadow = '2px 2px 0 rgba(0,0,0,0.2)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (isCorrect !== false) {
-                        e.target.style.transform = 'translate(-1px, -1px)';
-                        e.target.style.boxShadow = '3px 3px 0 rgba(0,0,0,0.2)';
-                      }
-                    }}
-                  >
-                    下一个
-                  </button>
-                </div>
-                
-                <div style={styles.controlRow}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#8b0000', fontWeight: 700 }}>
-                    <input 
-                      type="checkbox" 
-                      checked={autoAdvance}
-                      onChange={(e) => setAutoAdvance(e.target.checked)}
-                      style={{ width: 16, height: 16 }}
-                    />
-                    <span style={{ fontSize: 14 }}>自动前进</span>
-                  </label>
-                  
-                  <button
-                    onClick={practiceUnmasteredWords}
-                    style={styles.toggleButton}
-                  >
-                    练习生词
-                  </button>
-                </div>
-                
-                <div style={styles.progressContainer}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-                    <div>
-                      <h3 style={styles.sectionTitle}>学习进度</h3>
-                      <p style={styles.progressText}>
-                        第 {currentWordIndex + 1} 个，共 {vocabularyData.length} 个
-                        <strong style={{ marginLeft: 8, color: '#c41e3a' }}>
-                          ({Math.round((currentWordIndex + 1) / vocabularyData.length * 100)}%)
-                        </strong>
-                      </p>
-                      <div style={styles.progressBar}>
-                        <div 
-                          style={{
-                            ...styles.progressBarInner,
-                            width: `${Math.round((currentWordIndex + 1) / vocabularyData.length * 100)}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 style={styles.sectionTitle}>掌握程度</h3>
-                      <p style={styles.progressText}>
-                        {Object.keys(masteredWords).length} / {vocabularyData.length} 词汇
-                        <strong style={{ marginLeft: 8, color: '#c41e3a' }}>
-                          ({getMasteryPercentage()}%)
-                        </strong>
-                      </p>
-                      <div style={styles.progressBar}>
-                        <div 
-                          style={{
-                            ...styles.progressBarInner,
-                            width: `${getMasteryPercentage()}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 style={styles.sectionTitle}>本次成绩</h3>
-                    <p style={styles.progressText}>
-                      {correctAnswers} 正确 / {attemptedWords} 尝试
-                      {attemptedWords > 0 && (
-                        <strong style={{ marginLeft: 8, color: '#c41e3a' }}>
-                          ({Math.round((correctAnswers / attemptedWords) * 100)}%)
-                        </strong>
-                      )}
-                    </p>
-                  </div>
-                  
-                  <div style={{ textAlign: 'right', marginTop: 16 }}>
-                    <button 
-                      onClick={clearAllProgress}
-                      style={styles.link}
-                      onMouseEnter={(e) => {
-                        e.target.style.color = styles.linkHover.color;
-                        e.target.style.textDecoration = styles.linkHover.textDecoration;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.color = styles.link.color;
-                        e.target.style.textDecoration = styles.link.textDecoration;
-                      }}
-                    >
-                      清除所有进度
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          
-          <div style={styles.fileUploadSection}>
-            <h3 style={{ ...styles.sectionTitle, marginBottom: 12, textAlign: 'center', fontSize: 20 }}>词汇管理</h3>
-            
-            <label 
-              style={styles.uploadButton}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = styles.uploadButtonHover.backgroundColor;
-                e.target.style.borderColor = styles.uploadButtonHover.borderColor;
-                e.target.style.transform = styles.uploadButtonHover.transform;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = styles.uploadButton.backgroundColor;
-                e.target.style.borderColor = '#c41e3a';
-                e.target.style.transform = 'none';
-              }}
-            >
-              📁 点击上传CSV文件
-              <input 
-                type="file" 
-                accept=".csv" 
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-            </label>
-            
-            <div style={{ textAlign: 'center' }}>
-              <button 
-                onClick={downloadSampleCSV}
-                style={styles.link}
-                onMouseEnter={(e) => {
-                  e.target.style.color = styles.linkHover.color;
-                  e.target.style.textDecoration = styles.linkHover.textDecoration;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.color = styles.link.color;
-                  e.target.style.textDecoration = styles.link.textDecoration;
-                }}
-              >
-                📥 下载示例CSV文件
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Render the app
-    ReactDOM.render(<ChineseLearningApp />, document.getElementById('root'));
-  </script>
+            );
+        };
+        
+        ReactDOM.render(<ChineseLearningApp />, document.getElementById('root'));
+    </script>
 </body>
 </html>
