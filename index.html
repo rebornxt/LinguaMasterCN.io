@@ -842,17 +842,15 @@
             };
             
             const handleReset = () => {
+                // Only reset position and shuffle, keep all progress
                 setCurrentIndex(0);
-                setScore(0);
-                setAnsweredQuestions(new Set());
                 setSelectedOption(null);
                 setShowAnswer(false);
                 setCardFlipped(false);
                 setMessage('');
                 setMessageType('');
-                setStreak(0);
-                setTotalAnswered(0);
                 
+                // Re-shuffle the deck for new random order
                 if (vocabulary.length > 0) {
                     const indices = Array.from({ length: vocabulary.length }, (_, i) => i);
                     setShuffledIndices(shuffleArray(indices));
