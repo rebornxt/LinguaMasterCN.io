@@ -89,6 +89,14 @@
         footer .bar-fill#progressBar { background-color: var(--modern-red); }
         footer .bar-fill#accuracyBar { background-color: var(--accent-gold); }
         footer .text-slate-400 { color: #95a5a6; }
+        .auth-form input {
+            border: 1px solid var(--border-light-gray); padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem; margin-bottom: 0.75rem; width: 100%;
+        }
+        .auth-form input:focus {
+            outline: none; border-color: var(--accent-gold);
+            box-shadow: 0 0 0 2px rgba(176, 141, 87, 0.3);
+        }
     </style>
 </head>
 <body class="selection:bg-red-100">
@@ -106,9 +114,32 @@
             </button>
         </div>
         <p class="text-sm">Master Chinese, one card at a time.</p>
+        <div id="authStatus" class="mt-2 text-xs">Connecting...</div>
+        <button id="logoutBtn" class="btn btn-theme-outline text-xs py-1 px-2 mt-1 hidden">Logout</button>
     </header>
 
-    <div id="appArea" class="w-full max-w-4xl flex flex-col md:flex-row gap-6 px-2 sm:px-0">
+    <div id="authArea" class="w-full max-w-md mx-auto mb-8 p-6 bg-white rounded-xl shadow-lg border border-[var(--border-light-gray)]">
+        <div id="loginFormContainer">
+            <h2 class="text-xl font-semibold text-center mb-4 text-[var(--modern-red)]">Login</h2>
+            <form id="loginForm" class="auth-form">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit" class="btn btn-theme-primary w-full">Login</button>
+            </form>
+            <p class="text-center text-sm mt-3">Don't have an account? <button id="showSignupBtn" class="text-[var(--accent-gold)] hover:underline">Sign Up</button></p>
+        </div>
+        <div id="signupFormContainer" class="hidden">
+            <h2 class="text-xl font-semibold text-center mb-4 text-[var(--modern-red)]">Sign Up</h2>
+            <form id="signupForm" class="auth-form">
+                <input type="email" id="signupEmail" placeholder="Email" required>
+                <input type="password" id="signupPassword" placeholder="Password (min. 6 characters)" required>
+                <button type="submit" class="btn btn-theme-primary w-full">Sign Up</button>
+            </form>
+            <p class="text-center text-sm mt-3">Already have an account? <button id="showLoginBtn" class="text-[var(--accent-gold)] hover:underline">Login</button></p>
+        </div>
+    </div>
+
+    <div id="appArea" class="hidden w-full max-w-4xl flex-col md:flex-row gap-6 px-2 sm:px-0">
         <aside id="controlPanelContainer" class="w-full md:w-1/3 lg:w-1/4">
             <div id="controlPanel" class="p-4 shadow-lg md:sticky md:top-8"> 
                 <div>
@@ -205,12 +236,12 @@
         </main>
     </div>
     
-    <div id="deckActionsArea" class="w-full max-w-4xl mt-8 flex flex-col sm:flex-row justify-center items-center gap-3">
+    <div id="deckActionsArea" class="hidden w-full max-w-4xl mt-8 flex-col sm:flex-row justify-center items-center gap-3">
         <button id="shuffleDeckBtn" class="btn btn-theme-primary w-full sm:w-auto">Shuffle Current Deck</button>
         <button id="resetProgressBtn" class="btn btn-theme-danger w-full sm:w-auto">Reset All Progress</button>
     </div>
 
-    <footer id="footerArea" class="w-full max-w-4xl mt-6 pt-6 border-t"> 
+    <footer id="footerArea" class="hidden w-full max-w-4xl mt-6 pt-6 border-t"> 
         <div class="grid grid-cols-2 gap-x-4 gap-y-2 items-center text-sm mb-2"> 
             <div>Progress: <span id="progressText">0/0</span></div>
             <div id="accuracyDisplayContainer" class="text-right">Accuracy: <span id="accuracyText">N/A</span></div>
@@ -221,11 +252,85 @@
                 <div id="accuracyBar" class="bar-fill"></div>
             </div>
         </div>
-         <p class="text-xs text-center mt-4">HanziFlow v1.8 - Local Storage (Persistent Index)</p>
+         <p class="text-xs text-center mt-4">HanziFlow v1.9 - Firebase Sync</p>
     </footer>
 
-    <script>
-        // No Firebase imports needed for this version
+    <script type="module">
+        // Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged,
+            signInWithCustomToken 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            setDoc, 
+            getDoc,
+            deleteDoc 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Configuration ---
+        // IMPORTANT: 
+        // 1. Replace placeholders below with your actual Firebase project configuration
+        //    if not running in an environment that provides __firebase_config.
+        // 2. In your Firebase Console > Authentication > Sign-in method:
+        //    ENABLE "Email/Password" provider for manual signup/login to work.
+        let firebaseConfig;
+        let appId = typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-default-app'; // Default app ID
+
+        if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+                if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+                    throw new Error("Firebase config from __firebase_config is missing essential fields (apiKey, projectId).");
+                }
+                 appId = firebaseConfig.appId || appId; // Prefer appId from config if available
+            } catch (e) {
+                console.error("Error parsing __firebase_config:", e);
+                // Fallback to clearly invalid placeholders if parsing fails
+                firebaseConfig = { apiKey: "INVALID_CONFIG_JSON", authDomain: "", projectId: "INVALID_CONFIG_JSON", appId: "" };
+            }
+        } else {
+            // Fallback / Placeholder Configuration (REPLACE THESE WITH YOUR ACTUAL CONFIG)
+            console.warn("Using placeholder Firebase config. Replace with your project's config for live functionality.");
+            firebaseConfig = {
+                apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
+                authDomain: "lingualflow-eecd2.firebaseapp.com",
+                projectId: "lingualflow-eecd2",
+                storageBucket: "lingualflow-eecd2.firebasestorage.app",
+                messagingSenderId: "337589259202",
+                appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b" // Can be the same as your web app ID in Firebase
+            };
+             // If running locally, ensure appId is set for Firestore paths
+            if (appId === 'hanziflow-default-app' && firebaseConfig.appId && firebaseConfig.appId !== "YOUR_APP_ID") {
+                appId = firebaseConfig.appId;
+            } else if (appId === 'hanziflow-default-app' && firebaseConfig.projectId !== "YOUR_PROJECT_ID") {
+                // Try to construct a unique enough app ID if only projectId is available
+                appId = `hanziflow-${firebaseConfig.projectId}`;
+            }
+        }
+        
+        // Initialize Firebase
+        let firebaseApp;
+        let auth;
+        let db;
+
+        try {
+            firebaseApp = initializeApp(firebaseConfig);
+            auth = getAuth(firebaseApp);
+            db = getFirestore(firebaseApp);
+            console.log("Firebase Initialized. Project ID:", firebaseConfig.projectId, "App ID for Firestore:", appId);
+        } catch (error) {
+            console.error("Error initializing Firebase:", error);
+            showMessage("Could not initialize Firebase. App features requiring Firebase will not work.", "error", 10000);
+            // You might want to disable parts of the UI or show a persistent error message
+        }
+
 
         // --- DATA URLs ---
         const DATA_URLS = {
@@ -251,6 +356,8 @@
             isFlashcardFlipped: false,
             controlPanelOpen: false,
             isLoading: false,
+            currentUser: null, 
+            userId: null 
         };
 
         const el = {}; 
@@ -305,54 +412,92 @@
             return dataObjects;
         }
         
-        // --- LOCAL STORAGE DATA HANDLING ---
+        // --- FIRESTORE DATA HANDLING ---
         function getDeckState() {
             return appState.progress[appState.deckSource];
         }
 
-        function loadProgressFromLocalStorage() {
-            ['words', 'sentences'].forEach(source => {
-                const reviewKey = `hanziflow_reviewIds_${source}`;
-                const learnedKey = `hanziflow_learnedIds_${source}`;
-                const quizAttemptsKey = `hanziflow_quizAttempts_${source}`;
-                const quizCorrectKey = `hanziflow_quizCorrect_${source}`;
-                const currentIndexKey = `hanziflow_currentIndex_${source}`; // Key for current index
+        async function loadUserProgressFromFirestore() {
+            if (!appState.userId || !db) { // Check if db is initialized
+                console.log("No user ID or Firestore DB not initialized, cannot load progress.");
+                appState.progress.words = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
+                appState.progress.sentences = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
+                return;
+            }
 
-                const storedReviewIds = localStorage.getItem(reviewKey);
-                const storedLearnedIds = localStorage.getItem(learnedKey);
-                const storedQuizAttempts = localStorage.getItem(quizAttemptsKey);
-                const storedQuizCorrect = localStorage.getItem(quizCorrectKey);
-                const storedCurrentIndex = localStorage.getItem(currentIndexKey);
-
-                appState.progress[source] = { 
-                    currentIndex: storedCurrentIndex ? parseInt(storedCurrentIndex, 10) : 0, // Load or default to 0
-                    quizAttempts: storedQuizAttempts ? parseInt(storedQuizAttempts, 10) : 0, 
-                    quizCorrect: storedQuizCorrect ? parseInt(storedQuizCorrect, 10) : 0, 
-                    reviewIds: storedReviewIds ? new Set(JSON.parse(storedReviewIds)) : new Set(), 
-                    learnedIds: storedLearnedIds ? new Set(JSON.parse(storedLearnedIds)) : new Set(), 
-                    quizAnsweredCurrent: false // Always reset this for a new session view
-                };
-            });
+            for (const source of ['words', 'sentences']) {
+                const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", source);
+                try {
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        appState.progress[source] = {
+                            currentIndex: 0, 
+                            quizAttempts: data.quizAttempts || 0,
+                            quizCorrect: data.quizCorrect || 0,
+                            reviewIds: new Set(data.reviewIds || []),
+                            learnedIds: new Set(data.learnedIds || []),
+                            quizAnsweredCurrent: false
+                        };
+                    } else {
+                        appState.progress[source] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
+                        console.log(`No progress document found for ${source}, initializing fresh.`);
+                    }
+                } catch (error) {
+                    console.error(`Error loading progress for ${source}:`, error);
+                    showMessage(`Error loading your progress for ${source}.`, 'error');
+                    appState.progress[source] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
+                }
+            }
         }
 
-        function saveDeckStateToLocalStorage() {
+        async function saveDeckStateToFirestore() {
+            if (!appState.userId || !db) {
+                console.warn("No user ID or Firestore DB not initialized, cannot save progress.");
+                return;
+            }
             const deckState = getDeckState();
             const source = appState.deckSource;
-            localStorage.setItem(`hanziflow_reviewIds_${source}`, JSON.stringify(Array.from(deckState.reviewIds)));
-            localStorage.setItem(`hanziflow_learnedIds_${source}`, JSON.stringify(Array.from(deckState.learnedIds)));
-            localStorage.setItem(`hanziflow_quizAttempts_${source}`, deckState.quizAttempts.toString());
-            localStorage.setItem(`hanziflow_quizCorrect_${source}`, deckState.quizCorrect.toString());
-            localStorage.setItem(`hanziflow_currentIndex_${source}`, deckState.currentIndex.toString()); // Save current index
-            console.log(`Progress for ${source} (including index ${deckState.currentIndex}) saved to localStorage.`);
+            // Ensure appId is valid before creating docRef
+            if (!appId || appId.includes("YOUR_") || appId.includes("MISSING_") || appId.includes("INVALID_")) {
+                console.error("Invalid appId for Firestore path:", appId, "Cannot save progress.");
+                showMessage("Error: App ID for database is not configured correctly.", "error");
+                return;
+            }
+            const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", source);
+            
+            const dataToSave = {
+                quizAttempts: deckState.quizAttempts,
+                quizCorrect: deckState.quizCorrect,
+                reviewIds: Array.from(deckState.reviewIds),
+                learnedIds: Array.from(deckState.learnedIds)
+            };
+
+            try {
+                await setDoc(docRef, dataToSave, { merge: true }); 
+                console.log(`Progress for ${source} saved to Firestore.`);
+            } catch (error) {
+                console.error(`Error saving progress for ${source}:`, error);
+                showMessage(`Error saving your progress.`, 'error');
+            }
         }
         
-        function resetProgressInLocalStorage(deckSourceToReset) {
-            localStorage.removeItem(`hanziflow_reviewIds_${deckSourceToReset}`);
-            localStorage.removeItem(`hanziflow_learnedIds_${deckSourceToReset}`);
-            localStorage.removeItem(`hanziflow_quizAttempts_${deckSourceToReset}`);
-            localStorage.removeItem(`hanziflow_quizCorrect_${deckSourceToReset}`);
-            localStorage.removeItem(`hanziflow_currentIndex_${deckSourceToReset}`); // Also remove saved index
-            console.log(`Progress for ${deckSourceToReset} reset in localStorage.`);
+        async function resetUserProgressInFirestore(deckSourceToReset) {
+            if (!appState.userId || !db) return;
+            if (!appId || appId.includes("YOUR_") || appId.includes("MISSING_") || appId.includes("INVALID_")) {
+                console.error("Invalid appId for Firestore path:", appId, "Cannot reset progress.");
+                return;
+            }
+            const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", deckSourceToReset);
+            try {
+                await setDoc(docRef, {
+                    quizAttempts: 0, quizCorrect: 0, reviewIds: [], learnedIds: []
+                });
+                console.log(`Progress for ${deckSourceToReset} reset in Firestore.`);
+            } catch (error) {
+                console.error(`Error resetting progress for ${deckSourceToReset}:`, error);
+                showMessage(`Error resetting progress.`, 'error');
+            }
         }
 
 
@@ -375,134 +520,106 @@
             }
             
             const currentDeckState = getDeckState();
-            // currentDeckState.currentIndex is now loaded by loadProgressFromLocalStorage
-            currentDeckState.quizAnsweredCurrent = false; // Reset for new view/session
+            currentDeckState.currentIndex = 0; 
+            currentDeckState.quizAnsweredCurrent = false; 
             
             filterAndSetCurrentDeck(); 
-            // Ensure currentIndex is valid after filtering (e.g., if deck became shorter)
-            if (currentDeckState.currentIndex >= appState.currentDeck.length) {
-                currentDeckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
-            }
             updateDisplay();
         }
         
         // --- UI State Updates ---
-        function setLoadingState(isLoading) { /* ... same as v1.8 ... */ 
+        function setLoadingState(isLoading) { /* ... (same as v1.7) ... */ }
+        function filterAndSetCurrentDeck() { /* ... (same as v1.7) ... */ }
+        function updateDisplay() { /* ... (same as v1.7) ... */ }
+        function updateToggleButtonStates() { /* ... (same as v1.7) ... */ }
+        function updateModeVisibility() { /* ... (same as v1.7, ensure el.flashcardFeedbackButtons check) ... */ }
+        function updateNavigationButtons() { /* ... (same as v1.7) ... */ }
+        function updateProgressAndAccuracy() { /* ... (same as v1.7) ... */ }
+        function updateStatusCounts() { /* ... (same as v1.7) ... */ }
+        function flipCard() { /* ... (same as v1.7) ... */ }
+        function handleFlashcardFeedback(isRemembered) { /* ... (uses saveDeckStateToFirestore) ... */ }
+        function renderQuizChoices(currentItem) { /* ... (same as v1.7) ... */ }
+        function handleQuizAnswer(isCorrect, clickedButton, correctAnswerText) { /* ... (uses saveDeckStateToFirestore) ... */ }
+        function goToNextItem() { /* ... (same as v1.7) ... */ }
+        function goToPrevItem() { /* ... (same as v1.7) ... */ }
+        
+        // --- Simplified versions of unchanged functions for brevity in this example ---
+        setLoadingState = function(isLoading) {
             appState.isLoading = isLoading;
-            const loadingText = "Loading..."; 
+            const loadingText = "Loading...";
+            if (!el.flashcardChar || !el.quizChar) return; // Ensure DOM elements are ready
+
             if (isLoading) {
                 if (appState.currentMode === 'flashcard') {
-                    el.flashcardChar.textContent = loadingText;
-                    el.flashcardChar.classList.add('loading-placeholder');
+                    el.flashcardChar.textContent = loadingText; el.flashcardChar.classList.add('loading-placeholder');
                     el.flashcardPinyin.textContent = ''; el.flashcardEn.textContent = ''; el.flashcardTh.textContent = '';
                 } else {
-                    el.quizChar.textContent = loadingText;
-                    el.quizChar.classList.add('loading-placeholder');
+                    el.quizChar.textContent = loadingText; el.quizChar.classList.add('loading-placeholder');
                     el.quizPinyin.textContent = ''; el.quizChoicesArea.innerHTML = '';
                 }
-                if (el.appArea && el.deckActionsArea) { 
-                    document.querySelectorAll('#appArea button, #deckActionsArea button').forEach(btn => btn.disabled = true);
-                }
-
+                 document.querySelectorAll('#appArea button, #deckActionsArea button, #controlPanel button').forEach(btn => btn.disabled = true);
             } else {
-                 el.flashcardChar.classList.remove('loading-placeholder');
-                 el.quizChar.classList.remove('loading-placeholder');
-                 if (el.appArea && el.deckActionsArea) {
-                    document.querySelectorAll('#appArea button, #deckActionsArea button').forEach(btn => btn.disabled = false);
-                    el.shuffleDeckBtn.disabled = appState.currentDeck.length === 0; 
-                 }
+                el.flashcardChar.classList.remove('loading-placeholder'); el.quizChar.classList.remove('loading-placeholder');
+                document.querySelectorAll('#appArea button, #deckActionsArea button, #controlPanel button').forEach(btn => btn.disabled = false);
+                if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.currentDeck.length === 0;
             }
-            if (el.flashcardChar) { 
-                 updateDisplay(); 
-            }
-        }
-        function filterAndSetCurrentDeck() { /* ... same as v1.8 ... */ 
-            const deckState = getDeckState();
-            let deckToUse = [];
-
-            if (appState.deckViewType === 'all') {
-                deckToUse = [...appState.masterDeck]; 
-            } else if (appState.deckViewType === 'review') {
-                deckToUse = appState.masterDeck.filter(item => deckState.reviewIds.has(item.id));
-                shuffleArray(deckToUse); 
+            if(el.flashcardChar) updateDisplay(); // Refresh UI
+        };
+        filterAndSetCurrentDeck = function() {
+            const deckState = getDeckState(); let deckToUse = [];
+            if (appState.deckViewType === 'all') deckToUse = [...appState.masterDeck];
+            else if (appState.deckViewType === 'review') {
+                deckToUse = appState.masterDeck.filter(item => deckState.reviewIds.has(item.id)); shuffleArray(deckToUse);
             } else if (appState.deckViewType === 'unlearned') {
-                deckToUse = appState.masterDeck.filter(item => !deckState.learnedIds.has(item.id));
-                shuffleArray(deckToUse); 
+                deckToUse = appState.masterDeck.filter(item => !deckState.learnedIds.has(item.id)); shuffleArray(deckToUse);
             }
-            
             appState.currentDeck = deckToUse;
             if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.isLoading || appState.currentDeck.length === 0;
-
-
-            if (deckState.currentIndex >= appState.currentDeck.length) {
-                deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
+            if (deckState.currentIndex >= appState.currentDeck.length) deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
+            if (appState.currentDeck.length === 0 && appState.masterDeck.length > 0) {
+                showMessage(`${appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1)} deck is empty.`, "info");
             }
-             if (appState.currentDeck.length === 0 && appState.masterDeck.length > 0) {
-                const viewName = appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1);
-                showMessage(`${viewName} deck is empty.`, "info");
-            }
-        }
-        function updateDisplay() { /* ... same as v1.8 ... */ 
+        };
+        updateDisplay = function() {
             if (!el.deckWordsBtn) return; 
-
-            updateToggleButtonStates();
-            updateModeVisibility(); 
-            updateNavigationButtons();
-            updateProgressAndAccuracy(); 
-            updateStatusCounts();       
-
+            updateToggleButtonStates(); updateModeVisibility(); updateNavigationButtons();
+            updateProgressAndAccuracy(); updateStatusCounts();
             if (appState.isLoading) {
-                el.prevBtn.disabled = true; el.nextBtn.disabled = true;
-                if(el.quizChoicesArea) el.quizChoicesArea.innerHTML = '';
-                return;
+                if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true;
+                if(el.quizChoicesArea) el.quizChoicesArea.innerHTML = ''; return;
             }
-            
             const deckState = getDeckState();
             if (appState.currentDeck.length === 0) {
-                const msg = appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1) + " Deck Empty";
+                const msg = `${appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1)} Deck Empty`;
                 if (appState.currentMode === 'flashcard') {
-                    el.flashcardChar.textContent = msg; el.flashcardPinyin.textContent = '';
-                    el.flashcardEn.textContent = ''; el.flashcardTh.textContent = ''; el.flashcardPinyinBack.textContent = '';
+                    el.flashcardChar.textContent = msg; el.flashcardPinyin.textContent = ''; el.flashcardEn.textContent = '';
+                    el.flashcardTh.textContent = ''; el.flashcardPinyinBack.textContent = '';
                     el.flashcard.classList.remove('flipped'); appState.isFlashcardFlipped = false;
-                } else { 
+                } else {
                     el.quizChar.textContent = msg; el.quizPinyin.textContent = '';
                     el.quizChoicesArea.innerHTML = ''; el.quizFeedback.textContent = '';
                 }
-                el.prevBtn.disabled = true; el.nextBtn.disabled = true;
-                return; 
+                if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true; return;
             }
-            
-            if (deckState.currentIndex >= appState.currentDeck.length) {
-                 deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1); 
-            }
+            if (deckState.currentIndex >= appState.currentDeck.length) deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
             if (deckState.currentIndex < 0 && appState.currentDeck.length > 0) deckState.currentIndex = 0;
-
-
             const currentItem = appState.currentDeck[deckState.currentIndex];
             if (!currentItem) {
-                 console.error("Current item is undefined. Index:", deckState.currentIndex, "Deck:", appState.currentDeck);
-                 el.flashcardChar.textContent = 'Error.'; 
-                 el.prevBtn.disabled = true; el.nextBtn.disabled = true;
-                 return;
+                el.flashcardChar.textContent = 'Error.'; if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true; return;
             }
-
             const charToDisplay = appState.showSimplified ? currentItem.s : currentItem.t;
             const pinyinToDisplay = appState.showPinyin ? currentItem.p : '';
-
             if (appState.currentMode === 'flashcard') {
                 el.flashcardChar.textContent = charToDisplay; el.flashcardPinyin.textContent = pinyinToDisplay;
                 el.flashcardEn.textContent = currentItem.en; el.flashcardTh.textContent = currentItem.th;
-                el.flashcardPinyinBack.textContent = pinyinToDisplay; 
+                el.flashcardPinyinBack.textContent = pinyinToDisplay;
                 el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
-            } else { 
+            } else {
                 el.quizChar.textContent = charToDisplay; el.quizPinyin.textContent = pinyinToDisplay;
-                if (!deckState.quizAnsweredCurrent) { 
-                    renderQuizChoices(currentItem);
-                    el.quizFeedback.textContent = '';
-                }
+                if (!deckState.quizAnsweredCurrent) { renderQuizChoices(currentItem); el.quizFeedback.textContent = ''; }
             }
-        }
-        function updateToggleButtonStates() { /* ... same as v1.8 ... */ 
+        };
+        updateToggleButtonStates = function() { /* ... same ... */ 
             el.deckWordsBtn.classList.toggle('active', appState.deckSource === 'words');
             el.deckSentencesBtn.classList.toggle('active', appState.deckSource === 'sentences');
             el.modeFlashcardBtn.classList.toggle('active', appState.currentMode === 'flashcard');
@@ -513,26 +630,23 @@
             el.pinyinHideBtn.classList.toggle('active', !appState.showPinyin);
             el.transEnBtn.classList.toggle('active', appState.quizTranslationLanguage === 'en');
             el.transThBtn.classList.toggle('active', appState.quizTranslationLanguage === 'th');
-            
             el.deckAllBtn.classList.toggle('active', appState.deckViewType === 'all');
             el.deckReviewBtn.classList.toggle('active', appState.deckViewType === 'review');
             el.deckUnlearnedBtn.classList.toggle('active', appState.deckViewType === 'unlearned');
-
             el.autoAdvanceToggle.classList.toggle('bg-[var(--modern-red)]', appState.autoAdvance);
             el.autoAdvanceToggle.classList.toggle('bg-gray-200', !appState.autoAdvance);
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-5', appState.autoAdvance);
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-1', !appState.autoAdvance);
-        }
-        function updateModeVisibility() { /* ... same as v1.8 ... */ 
+        };
+        updateModeVisibility = function() { 
             const isFlashcard = appState.currentMode === 'flashcard';
             el.flashcardModeDiv.classList.toggle('hidden', !isFlashcard);
             el.quizModeDiv.classList.toggle('hidden', isFlashcard);
             el.quizTranslationToggleContainer.classList.toggle('hidden', isFlashcard); 
             el.accuracyDisplayContainer.classList.toggle('hidden', isFlashcard); 
-            
             if (!appState.isLoading) getDeckState().quizAnsweredCurrent = false; 
-        }
-        function updateNavigationButtons() { /* ... same as v1.8 ... */ 
+        };
+        updateNavigationButtons = function() { /* ... same ... */ 
             el.navigationButtons.classList.toggle('hidden', appState.autoAdvance || appState.isLoading);
             const deckState = getDeckState();
             if (appState.currentDeck.length === 0 || appState.isLoading) {
@@ -541,59 +655,47 @@
                 el.prevBtn.disabled = deckState.currentIndex === 0;
                 el.nextBtn.disabled = deckState.currentIndex === appState.currentDeck.length - 1;
             }
-        }
-        function updateProgressAndAccuracy() { /* ... same as v1.8 ... */ 
+        };
+        updateProgressAndAccuracy = function() { /* ... same ... */ 
             const deckState = getDeckState();
             const totalItems = appState.currentDeck.length;
             const reviewedItems = totalItems > 0 ? deckState.currentIndex + 1 : 0;
-            
             el.progressText.textContent = `${reviewedItems}/${totalItems}`;
             el.progressBar.style.width = totalItems > 0 ? `${(reviewedItems / totalItems) * 100}%` : '0%';
-
             if (appState.currentMode === 'quiz') {
-                const accuracy = deckState.quizAttempts > 0 ?
-                    ((deckState.quizCorrect / deckState.quizAttempts) * 100) : 0; 
+                const accuracy = deckState.quizAttempts > 0 ? ((deckState.quizCorrect / deckState.quizAttempts) * 100) : 0; 
                 el.accuracyText.textContent = deckState.quizAttempts > 0 ? `${accuracy.toFixed(0)}%` : 'N/A';
                 el.accuracyBar.style.width = `${accuracy}%`;
             } else {
-                 el.accuracyText.textContent = 'N/A';
-                 el.accuracyBar.style.width = '0%';
+                 el.accuracyText.textContent = 'N/A'; el.accuracyBar.style.width = '0%';
             }
-        }
-        function updateStatusCounts() { /* ... same as v1.8 ... */ 
+        };
+        updateStatusCounts = function() { /* ... same ... */ 
             const deckState = getDeckState();
             el.reviewDeckCount.textContent = `Review: ${deckState.reviewIds.size}`;
             el.learnedDeckCount.textContent = `Learned: ${deckState.learnedIds.size}`;
-        }
-        function flipCard() { /* ... same as v1.8 ... */ 
+        };
+        flipCard = function() { /* ... same ... */ 
             if (appState.isLoading || appState.currentDeck.length === 0) return;
             appState.isFlashcardFlipped = !appState.isFlashcardFlipped;
             el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
-        }
-        function handleFlashcardFeedback(isRemembered) { /* ... (uses saveDeckStateToLocalStorage) ... */ 
-            if (appState.isLoading) return; 
-            const deckState = getDeckState();
-            const currentItem = appState.currentDeck[deckState.currentIndex];
+        };
+        handleFlashcardFeedback = function(isRemembered) { /* ... (uses saveDeckStateToFirestore) ... */ 
+            if (appState.isLoading || !appState.currentUser) return; 
+            const deckState = getDeckState(); const currentItem = appState.currentDeck[deckState.currentIndex];
             if (!currentItem) return; 
-
             const charText = appState.showSimplified ? currentItem.s : currentItem.t;
-
             if (isRemembered) {
                 showMessage(`"${charText}" marked as remembered.`, 'success', 1500);
-                deckState.learnedIds.add(currentItem.id);
-                deckState.reviewIds.delete(currentItem.id); 
+                deckState.learnedIds.add(currentItem.id); deckState.reviewIds.delete(currentItem.id); 
             } else { 
                 showMessage(`"${charText}" added to review.`, 'info', 1500);
-                deckState.reviewIds.add(currentItem.id);
-                deckState.learnedIds.delete(currentItem.id); 
+                deckState.reviewIds.add(currentItem.id); deckState.learnedIds.delete(currentItem.id); 
             }
-            saveDeckStateToLocalStorage(); 
-            updateStatusCounts(); 
-
+            saveDeckStateToFirestore(); updateStatusCounts(); 
             let deckNeedsRefilter = false;
             if (appState.deckViewType === 'unlearned' && isRemembered) deckNeedsRefilter = true;
             else if (appState.deckViewType === 'review' && isRemembered) deckNeedsRefilter = true;
-
             if (appState.autoAdvance) {
                 if (deckNeedsRefilter) {
                     setTimeout(() => {
@@ -615,8 +717,8 @@
                 }
                 updateDisplay(); 
             }
-        }
-        function renderQuizChoices(currentItem) { /* ... same as v1.8 ... */ 
+        };
+        renderQuizChoices = function(currentItem) { /* ... same ... */ 
             el.quizChoicesArea.innerHTML = ''; 
             const correctAnswerLang = appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th;
             let choices = [correctAnswerLang];
@@ -633,17 +735,15 @@
                 choiceButton.onclick = () => handleQuizAnswer(choiceText === correctAnswerLang, choiceButton, correctAnswerLang);
                 el.quizChoicesArea.appendChild(choiceButton);
             });
-        }
-        function handleQuizAnswer(isCorrect, clickedButton, correctAnswerText) { /* ... (uses saveDeckStateToLocalStorage) ... */ 
+        };
+        handleQuizAnswer = function(isCorrect, clickedButton, correctAnswerText) { /* ... (uses saveDeckStateToFirestore) ... */ 
             const deckState = getDeckState();
-            if (deckState.quizAnsweredCurrent || appState.isLoading) return; 
-
+            if (deckState.quizAnsweredCurrent || appState.isLoading || !appState.currentUser) return; 
             deckState.quizAnsweredCurrent = true; deckState.quizAttempts++;
             const currentItem = appState.currentDeck[deckState.currentIndex];
             if (!currentItem) return; 
             const charText = appState.showSimplified ? currentItem.s : currentItem.t;
             let deckNeedsRefilter = false;
-
             if (isCorrect) {
                 deckState.quizCorrect++;
                 el.quizFeedback.textContent = 'Correct! 🎉'; el.quizFeedback.className = 'mt-4 text-center font-semibold text-green-600';
@@ -662,8 +762,7 @@
                 deckState.reviewIds.add(currentItem.id); deckState.learnedIds.delete(currentItem.id); 
                 showMessage(`Added "${charText}" to review.`, 'error', 2000);
             }
-            saveDeckStateToLocalStorage(); updateStatusCounts(); updateProgressAndAccuracy(); 
-
+            saveDeckStateToFirestore(); updateStatusCounts(); updateProgressAndAccuracy(); 
             if (appState.autoAdvance) {
                  if (deckNeedsRefilter) {
                     setTimeout(() => {
@@ -685,34 +784,42 @@
                 }
                  updateDisplay(); 
             }
-        }
-        function goToNextItem() { /* ... same as v1.8 ... */ 
+        };
+        goToNextItem = function() { /* ... same ... */ 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex < appState.currentDeck.length - 1) {
-                deckState.currentIndex++;
-                appState.isFlashcardFlipped = false; 
-                deckState.quizAnsweredCurrent = false; 
-                updateDisplay();
+                deckState.currentIndex++; appState.isFlashcardFlipped = false; 
+                deckState.quizAnsweredCurrent = false; updateDisplay();
             } else if (appState.currentDeck.length > 0) { 
                 showMessage("You've reached the end of the deck!", "info");
             }
-        }
-        function goToPrevItem() { /* ... same as v1.8 ... */ 
+        };
+        goToPrevItem = function() { /* ... same ... */ 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex > 0) {
-                deckState.currentIndex--;
-                appState.isFlashcardFlipped = false;
-                deckState.quizAnsweredCurrent = false;
-                updateDisplay();
+                deckState.currentIndex--; appState.isFlashcardFlipped = false;
+                deckState.quizAnsweredCurrent = false; updateDisplay();
             }
-        }
-        function setupDOMReferences() { /* ... same as v1.8, but no auth elements ... */ 
+        };
+        setupDOMReferences = function() { /* ... same ... */ 
+            el.authArea = document.getElementById('authArea');
             el.appArea = document.getElementById('appArea');
             el.deckActionsArea = document.getElementById('deckActionsArea');
             el.footerArea = document.getElementById('footerArea');
-
+            el.loginForm = document.getElementById('loginForm');
+            el.signupForm = document.getElementById('signupForm');
+            el.loginEmail = document.getElementById('loginEmail');
+            el.loginPassword = document.getElementById('loginPassword');
+            el.signupEmail = document.getElementById('signupEmail');
+            el.signupPassword = document.getElementById('signupPassword');
+            el.showSignupBtn = document.getElementById('showSignupBtn');
+            el.showLoginBtn = document.getElementById('showLoginBtn');
+            el.logoutBtn = document.getElementById('logoutBtn');
+            el.authStatus = document.getElementById('authStatus');
+            el.loginFormContainer = document.getElementById('loginFormContainer');
+            el.signupFormContainer = document.getElementById('signupFormContainer');
             el.deckWordsBtn = document.getElementById('deckWordsBtn');
             el.deckSentencesBtn = document.getElementById('deckSentencesBtn');
             el.modeFlashcardBtn = document.getElementById('modeFlashcardBtn');
@@ -762,9 +869,82 @@
             el.messageBox = document.getElementById('messageBox');
             el.toggleControlsBtn = document.getElementById('toggleControlsBtn');
             el.controlPanel = document.getElementById('controlPanel'); 
+        };
+        function setupAuthEventListeners() { /* ... (same as v1.7, added specific error for email-already-in-use) ... */ 
+             el.loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                try {
+                    await signInWithEmailAndPassword(auth, el.loginEmail.value, el.loginPassword.value);
+                    showMessage('Logged in successfully!', 'success');
+                } catch (error) {
+                    showMessage(`Login failed: ${error.message}`, 'error');
+                    console.error("Login error:", error);
+                }
+            });
+
+            el.signupForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                try {
+                    await createUserWithEmailAndPassword(auth, el.signupEmail.value, el.signupPassword.value);
+                    showMessage('Signed up successfully! You are now logged in.', 'success');
+                } catch (error) {
+                    if (error.code === 'auth/operation-not-allowed') {
+                        showMessage('Signup failed: Email/Password sign-in is not enabled for this app. Please check Firebase console settings.', 'error', 7000);
+                        console.error("Signup error: auth/operation-not-allowed. This usually means Email/Password sign-in provider needs to be enabled in your Firebase project's Authentication settings.", error);
+                    } else if (error.code === 'auth/email-already-in-use') {
+                         showMessage('Signup failed: This email is already in use. Please try logging in.', 'error', 6000);
+                    } else {
+                        showMessage(`Signup failed: ${error.message}`, 'error');
+                        console.error("Signup error:", error);
+                    }
+                }
+            });
+
+            el.logoutBtn.addEventListener('click', async () => {
+                if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                try {
+                    await signOut(auth);
+                    showMessage('Logged out.', 'info');
+                } catch (error) {
+                    showMessage(`Logout failed: ${error.message}`, 'error');
+                }
+            });
+
+            el.showSignupBtn.addEventListener('click', () => {
+                el.loginFormContainer.classList.add('hidden');
+                el.signupFormContainer.classList.remove('hidden');
+            });
+            el.showLoginBtn.addEventListener('click', () => {
+                el.signupFormContainer.classList.add('hidden');
+                el.loginFormContainer.classList.remove('hidden');
+            });
         }
-        
-        function setupAppEventListeners() { /* ... same as v1.8, but resetProgressBtn uses localStorage ... */ 
+        function updateUIForAuthState(user) { /* ... same as v1.7 ... */ 
+            if (user) {
+                el.authArea.classList.add('hidden');
+                el.appArea.style.display = 'flex'; // Use flex for the main layout
+                el.deckActionsArea.style.display = 'flex';
+                el.footerArea.style.display = 'block'; 
+                el.authStatus.textContent = `Logged in as: ${user.email || 'User'}`;
+                el.logoutBtn.classList.remove('hidden');
+            } else {
+                el.authArea.classList.remove('hidden');
+                el.appArea.style.display = 'none';
+                el.deckActionsArea.style.display = 'none'; 
+                el.footerArea.style.display = 'none';
+                el.authStatus.textContent = 'Not logged in.';
+                el.logoutBtn.classList.add('hidden');
+                if(el.progressText) el.progressText.textContent = '0/0';
+                if(el.progressBar) el.progressBar.style.width = '0%';
+                if(el.accuracyText) el.accuracyText.textContent = 'N/A';
+                if(el.accuracyBar) el.accuracyBar.style.width = '0%';
+                if(el.reviewDeckCount) el.reviewDeckCount.textContent = 'Review: 0';
+                if(el.learnedDeckCount) el.learnedDeckCount.textContent = 'Learned: 0';
+            }
+        }
+        function setupAppEventListeners() { /* ... same as v1.7 (uses saveDeckStateToFirestore, resetUserProgressInFirestore) ... */ 
             el.deckWordsBtn.addEventListener('click', async () => {
                 if (appState.isLoading || appState.deckSource === 'words') return;
                 appState.deckSource = 'words';
@@ -775,7 +955,6 @@
                 appState.deckSource = 'sentences';
                 await initializeDeck(); 
             });
-
             el.modeFlashcardBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.currentMode = 'flashcard'; appState.isFlashcardFlipped = false; updateDisplay();} });
             el.modeQuizBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.currentMode = 'quiz';updateDisplay();} });
             el.charSimplifiedBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.showSimplified = true; updateDisplay();} });
@@ -788,7 +967,6 @@
             el.deckReviewBtn.addEventListener('click', () => { if (!appState.isLoading && appState.deckViewType !== 'review') {appState.deckViewType = 'review'; getDeckState().currentIndex = 0; filterAndSetCurrentDeck(); updateDisplay();}});
             el.deckUnlearnedBtn.addEventListener('click', () => { if (!appState.isLoading && appState.deckViewType !== 'unlearned') {appState.deckViewType = 'unlearned'; getDeckState().currentIndex = 0; filterAndSetCurrentDeck(); updateDisplay();}});
             el.autoAdvanceToggle.addEventListener('click', () => { if (!appState.isLoading) {appState.autoAdvance = !appState.autoAdvance; updateDisplay();}});
-
             el.shuffleDeckBtn.addEventListener('click', () => {
                 if (appState.isLoading || appState.currentDeck.length === 0) return;
                 shuffleArray(appState.currentDeck); 
@@ -796,22 +974,17 @@
                 appState.isFlashcardFlipped = false; getDeckState().quizAnsweredCurrent = false;
                 showMessage("Current deck view shuffled!", "success", 1500); updateDisplay();
             });
-
-            el.resetProgressBtn.addEventListener('click', () => { 
-                if (appState.isLoading) return;
-                const userConfirmed = window.confirm("Are you sure you want to reset all progress for this deck source (Words/Sentences)? This will clear learned items, review items, and quiz scores from this browser.");
+            el.resetProgressBtn.addEventListener('click', async () => {
+                if (appState.isLoading || !appState.currentUser) return;
+                const userConfirmed = window.confirm("Are you sure you want to reset all progress for this deck source? This will clear learned items, review items, and quiz scores from your account for this deck.");
                 if (!userConfirmed) return;
-
                 const deckSourceToReset = appState.deckSource;
-                resetProgressInLocalStorage(deckSourceToReset); 
-                
+                await resetUserProgressInFirestore(deckSourceToReset);
                 appState.progress[deckSourceToReset] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
-                
                 filterAndSetCurrentDeck(); 
                 showMessage(`Progress for ${deckSourceToReset} deck has been reset.`, "info");
                 updateDisplay();
             });
-
             el.flashcard.addEventListener('click', (e) => { 
                 if (appState.isLoading) return;
                 if (e.target.closest('#reviewAgainBtn') || e.target.closest('#rememberBtn')) return; 
@@ -829,7 +1002,6 @@
                 else if (e.key === ' ' && appState.currentMode === 'flashcard') { e.preventDefault(); flipCard(); }
             });
             el.toggleControlsBtn.addEventListener('click', () => { appState.controlPanelOpen = !appState.controlPanelOpen; el.controlPanel.classList.toggle('open', appState.controlPanelOpen);});
-            
             function checkScreenSizeForControls() { 
                 if (window.innerWidth >= 768) { el.controlPanel.classList.add('open'); el.controlPanel.style.maxHeight = ''; } 
                 else { if (!appState.controlPanelOpen) el.controlPanel.classList.remove('open');}
@@ -840,12 +1012,50 @@
 
         // --- APP START ---
         async function startApp() {
-            console.log("App starting with Local Storage...");
+            console.log("App starting...");
             setupDOMReferences(); 
-            loadProgressFromLocalStorage(); 
+            setupAuthEventListeners(); 
             setupAppEventListeners(); 
-            await initializeDeck(); 
-            showMessage("Welcome to HanziFlow!", "info", 2000);
+
+            if (!auth || !db) {
+                 showMessage("Firebase not properly initialized. Cannot proceed.", "error", 10000);
+                 updateUIForAuthState(null); // Ensure login form is shown
+                 return;
+            }
+
+
+            onAuthStateChanged(auth, async (user) => {
+                appState.currentUser = user;
+                appState.userId = user ? user.uid : null;
+                updateUIForAuthState(user);
+
+                if (user) {
+                    console.log("User logged in:", user.uid);
+                    await loadUserProgressFromFirestore(); 
+                    await initializeDeck(); 
+                } else {
+                    console.log("User logged out or no user.");
+                    await loadUserProgressFromFirestore(); 
+                    await initializeDeck(); 
+                }
+            });
+            
+            if (firebaseConfig.apiKey === "MISSING_CONFIG" || firebaseConfig.apiKey === "INVALID_CONFIG" || firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+                updateUIForAuthState(null); 
+                showMessage("Firebase is not configured correctly with your project details. Please update the firebaseConfig in the script.", "error", 15000);
+                return; 
+            }
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                    console.log("Signed in with custom token.");
+                } catch (error) {
+                    console.error("Error signing in with custom token:", error);
+                }
+            } else if (!auth.currentUser) { 
+                console.log("No initial auth token, user needs to login/signup via form.");
+            }
         }
 
         document.addEventListener('DOMContentLoaded', startApp);
