@@ -666,6 +666,8 @@
         }
 
         function renderQuizChoices(currentItem) { 
+            const deckState = getDeckState(); 
+            console.log("[renderQuizChoices] Called. quizAnsweredCurrent:", deckState.quizAnsweredCurrent);
             el.quizChoicesArea.innerHTML = ''; 
             const correctAnswerLang = appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th;
             let choices = [correctAnswerLang];
@@ -679,17 +681,37 @@
                 const choiceButton = document.createElement('button');
                 choiceButton.className = 'btn btn-theme-outline w-full text-left p-3 quiz-choice';
                 choiceButton.textContent = choiceText;
-                choiceButton.onclick = () => handleQuizAnswer(choiceText === correctAnswerLang, choiceButton, correctAnswerText);
+                console.log("[renderQuizChoices] Creating choice button:", choiceText);
+                choiceButton.onclick = () => handleQuizAnswer(choiceText === correctAnswerLang, choiceButton, correctAnswerLang);
                 el.quizChoicesArea.appendChild(choiceButton);
             });
         }
 
         function handleQuizAnswer(isCorrect, clickedButton, correctAnswerText) { 
+            console.log("[handleQuizAnswer] Called. isCorrect:", isCorrect, "Button text:", clickedButton.textContent);
             const deckState = getDeckState();
-            if (deckState.quizAnsweredCurrent || appState.isLoading || !appState.currentUser) return; 
-            deckState.quizAnsweredCurrent = true; deckState.quizAttempts++;
+            
+            if (appState.isLoading) {
+                console.log("[handleQuizAnswer] Exiting: isLoading is true");
+                return;
+            }
+            if (!appState.currentUser) {
+                console.log("[handleQuizAnswer] Exiting: currentUser is null");
+                return;
+            }
+            if (deckState.quizAnsweredCurrent) {
+                console.log("[handleQuizAnswer] Exiting: quizAnsweredCurrent is true");
+                return; 
+            }
+            console.log("[handleQuizAnswer] Proceeding past initial checks.");
+
+            deckState.quizAnsweredCurrent = true; 
+            deckState.quizAttempts++;
             const currentItem = appState.currentDeck[deckState.currentIndex];
-            if (!currentItem) return; 
+            if (!currentItem) {
+                console.error("[handleQuizAnswer] Error: currentItem is undefined.");
+                return; 
+            }
             const charText = appState.showSimplified ? currentItem.s : currentItem.t;
             let deckNeedsRefilter = false;
             if (isCorrect) {
@@ -974,13 +996,12 @@
                 apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
                 authDomain: "lingualflow-eecd2.firebaseapp.com",
                 projectId: "lingualflow-eecd2",
-                storageBucket: "lingualflow-eecd2.firebasestorage.app",
+                storageBucket: "lingualflow-eecd2.appspot.com",
                 messagingSenderId: "337589259202",
                 appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b",
                 measurementId: "G-3DCPWXRZG3"
             };
 
-            // Use __firebase_config if available (Canvas environment), otherwise use userProvidedConfig
             if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
                 try {
                     currentFirebaseConfig = JSON.parse(__firebase_config);
