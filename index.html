@@ -252,7 +252,7 @@
                 <div id="accuracyBar" class="bar-fill"></div>
             </div>
         </div>
-         <p class="text-xs text-center mt-4">HanziFlow v1.9 - Firebase Sync</p>
+         <p class="text-xs text-center mt-4">HanziFlow v1.9 - Firebase Init Fix</p>
     </footer>
 
     <script type="module">
@@ -274,53 +274,12 @@
             deleteDoc 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration ---
-        let firebaseConfigFromUser = {
-            apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
-            authDomain: "lingualflow-eecd2.firebaseapp.com",
-            projectId: "lingualflow-eecd2",
-            storageBucket: "lingualflow-eecd2.firebasestorage.app", // Corrected: .appspot.com
-            messagingSenderId: "337589259202",
-            appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b",
-            measurementId: "G-3DCPWXRZG3" // measurementId is optional for Auth/Firestore
-        };
-
-        let firebaseConfig;
-        let appId = typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-default-app'; 
-
-        if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
-            try {
-                firebaseConfig = JSON.parse(__firebase_config);
-                if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-                    throw new Error("Firebase config from __firebase_config is missing essential fields (apiKey, projectId).");
-                }
-                 appId = firebaseConfig.appId || appId; 
-            } catch (e) {
-                console.error("Error parsing __firebase_config:", e);
-                firebaseConfig = firebaseConfigFromUser; // Fallback to user-provided if __firebase_config fails
-                appId = firebaseConfig.appId || appId;
-                showMessage("Using provided Firebase config due to __firebase_config error.", "info");
-            }
-        } else {
-            firebaseConfig = firebaseConfigFromUser;
-            appId = firebaseConfig.appId || appId;
-            console.warn("Using user-provided Firebase config as __firebase_config is not defined.");
-        }
-        
-        // Initialize Firebase
+        // --- Global Firebase variables ---
         let firebaseApp;
         let auth;
         let db;
-
-        try {
-            firebaseApp = initializeApp(firebaseConfig);
-            auth = getAuth(firebaseApp);
-            db = getFirestore(firebaseApp);
-            console.log("Firebase Initialized. Project ID:", firebaseConfig.projectId, "App ID for Firestore:", appId);
-        } catch (error) {
-            console.error("Error initializing Firebase:", error);
-            showMessage("Could not initialize Firebase. App features requiring Firebase will not work.", "error", 10000);
-        }
+        let currentFirebaseConfig; 
+        let currentAppId; 
 
 
         // --- DATA URLs ---
@@ -362,12 +321,16 @@
         }
 
         function showMessage(text, type = 'info', duration = 3000) {
-            el.messageBox.textContent = text;
-            el.messageBox.className = ''; 
-            el.messageBox.classList.add('show', type);
-            setTimeout(() => {
-                el.messageBox.classList.remove('show');
-            }, duration);
+            if (el.messageBox) { 
+                el.messageBox.textContent = text;
+                el.messageBox.className = ''; 
+                el.messageBox.classList.add('show', type);
+                setTimeout(() => {
+                    el.messageBox.classList.remove('show');
+                }, duration);
+            } else {
+                console.log(`Message (${type}): ${text}`); 
+            }
         }
         
         // --- DATA FETCHING AND PARSING (from CSV) ---
@@ -417,7 +380,7 @@
             }
 
             for (const source of ['words', 'sentences']) {
-                const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", source);
+                const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", source);
                 try {
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
@@ -449,12 +412,12 @@
             }
             const deckState = getDeckState();
             const source = appState.deckSource;
-            if (!appId || appId.includes("YOUR_") || appId.includes("MISSING_") || appId.includes("INVALID_")) {
-                console.error("Invalid appId for Firestore path:", appId, "Cannot save progress.");
+            if (!currentAppId || currentAppId.includes("YOUR_") || currentAppId.includes("MISSING_") || currentAppId.includes("INVALID_")) {
+                console.error("Invalid currentAppId for Firestore path:", currentAppId, "Cannot save progress.");
                 showMessage("Error: App ID for database is not configured correctly.", "error");
                 return;
             }
-            const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", source);
+            const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", source);
             
             const dataToSave = {
                 quizAttempts: deckState.quizAttempts,
@@ -474,11 +437,11 @@
         
         async function resetUserProgressInFirestore(deckSourceToReset) {
             if (!appState.userId || !db) return;
-            if (!appId || appId.includes("YOUR_") || appId.includes("MISSING_") || appId.includes("INVALID_")) {
-                console.error("Invalid appId for Firestore path:", appId, "Cannot reset progress.");
+            if (!currentAppId || currentAppId.includes("YOUR_") || currentAppId.includes("MISSING_") || currentAppId.includes("INVALID_")) {
+                console.error("Invalid currentAppId for Firestore path:", currentAppId, "Cannot reset progress.");
                 return;
             }
-            const docRef = doc(db, "artifacts", appId, "users", appState.userId, "progress", deckSourceToReset);
+            const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", deckSourceToReset);
             try {
                 await setDoc(docRef, {
                     quizAttempts: 0, quizCorrect: 0, reviewIds: [], learnedIds: []
@@ -518,23 +481,7 @@
         }
         
         // --- UI State Updates ---
-        function setLoadingState(isLoading) { /* ... (same as v1.7) ... */ }
-        function filterAndSetCurrentDeck() { /* ... (same as v1.7) ... */ }
-        function updateDisplay() { /* ... (same as v1.7) ... */ }
-        function updateToggleButtonStates() { /* ... (same as v1.7) ... */ }
-        function updateModeVisibility() { /* ... (same as v1.7, ensure el.flashcardFeedbackButtons check) ... */ }
-        function updateNavigationButtons() { /* ... (same as v1.7) ... */ }
-        function updateProgressAndAccuracy() { /* ... (same as v1.7) ... */ }
-        function updateStatusCounts() { /* ... (same as v1.7) ... */ }
-        function flipCard() { /* ... (same as v1.7) ... */ }
-        function handleFlashcardFeedback(isRemembered) { /* ... (uses saveDeckStateToFirestore) ... */ }
-        function renderQuizChoices(currentItem) { /* ... (same as v1.7) ... */ }
-        function handleQuizAnswer(isCorrect, clickedButton, correctAnswerText) { /* ... (uses saveDeckStateToFirestore) ... */ }
-        function goToNextItem() { /* ... (same as v1.7) ... */ }
-        function goToPrevItem() { /* ... (same as v1.7) ... */ }
-        
-        // --- Simplified versions of unchanged functions for brevity in this example ---
-        setLoadingState = function(isLoading) {
+        function setLoadingState(isLoading) {
             appState.isLoading = isLoading;
             const loadingText = "Loading...";
             if (!el.flashcardChar || !el.quizChar) return; 
@@ -554,8 +501,9 @@
                 if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.currentDeck.length === 0;
             }
             if(el.flashcardChar) updateDisplay(); 
-        };
-        filterAndSetCurrentDeck = function() {
+        }
+
+        function filterAndSetCurrentDeck() {
             const deckState = getDeckState(); let deckToUse = [];
             if (appState.deckViewType === 'all') deckToUse = [...appState.masterDeck];
             else if (appState.deckViewType === 'review') {
@@ -569,8 +517,9 @@
             if (appState.currentDeck.length === 0 && appState.masterDeck.length > 0) {
                 showMessage(`${appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1)} deck is empty.`, "info");
             }
-        };
-        updateDisplay = function() {
+        }
+
+        function updateDisplay() {
             if (!el.deckWordsBtn) return; 
             updateToggleButtonStates(); updateModeVisibility(); updateNavigationButtons();
             updateProgressAndAccuracy(); updateStatusCounts();
@@ -608,8 +557,9 @@
                 el.quizChar.textContent = charToDisplay; el.quizPinyin.textContent = pinyinToDisplay;
                 if (!deckState.quizAnsweredCurrent) { renderQuizChoices(currentItem); el.quizFeedback.textContent = ''; }
             }
-        };
-        updateToggleButtonStates = function() { /* ... same ... */ 
+        }
+
+        function updateToggleButtonStates() { 
             el.deckWordsBtn.classList.toggle('active', appState.deckSource === 'words');
             el.deckSentencesBtn.classList.toggle('active', appState.deckSource === 'sentences');
             el.modeFlashcardBtn.classList.toggle('active', appState.currentMode === 'flashcard');
@@ -627,16 +577,18 @@
             el.autoAdvanceToggle.classList.toggle('bg-gray-200', !appState.autoAdvance);
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-5', appState.autoAdvance);
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-1', !appState.autoAdvance);
-        };
-        updateModeVisibility = function() { 
+        }
+
+        function updateModeVisibility() { 
             const isFlashcard = appState.currentMode === 'flashcard';
             el.flashcardModeDiv.classList.toggle('hidden', !isFlashcard);
             el.quizModeDiv.classList.toggle('hidden', isFlashcard);
             el.quizTranslationToggleContainer.classList.toggle('hidden', isFlashcard); 
             el.accuracyDisplayContainer.classList.toggle('hidden', isFlashcard); 
             if (!appState.isLoading) getDeckState().quizAnsweredCurrent = false; 
-        };
-        updateNavigationButtons = function() { /* ... same ... */ 
+        }
+
+        function updateNavigationButtons() { 
             el.navigationButtons.classList.toggle('hidden', appState.autoAdvance || appState.isLoading);
             const deckState = getDeckState();
             if (appState.currentDeck.length === 0 || appState.isLoading) {
@@ -645,8 +597,9 @@
                 el.prevBtn.disabled = deckState.currentIndex === 0;
                 el.nextBtn.disabled = deckState.currentIndex === appState.currentDeck.length - 1;
             }
-        };
-        updateProgressAndAccuracy = function() { /* ... same ... */ 
+        }
+
+        function updateProgressAndAccuracy() { 
             const deckState = getDeckState();
             const totalItems = appState.currentDeck.length;
             const reviewedItems = totalItems > 0 ? deckState.currentIndex + 1 : 0;
@@ -659,18 +612,21 @@
             } else {
                  el.accuracyText.textContent = 'N/A'; el.accuracyBar.style.width = '0%';
             }
-        };
-        updateStatusCounts = function() { /* ... same ... */ 
+        }
+
+        function updateStatusCounts() { 
             const deckState = getDeckState();
             el.reviewDeckCount.textContent = `Review: ${deckState.reviewIds.size}`;
             el.learnedDeckCount.textContent = `Learned: ${deckState.learnedIds.size}`;
-        };
-        flipCard = function() { /* ... same ... */ 
+        }
+
+        function flipCard() { 
             if (appState.isLoading || appState.currentDeck.length === 0) return;
             appState.isFlashcardFlipped = !appState.isFlashcardFlipped;
             el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
-        };
-        handleFlashcardFeedback = function(isRemembered) { /* ... (uses saveDeckStateToFirestore) ... */ 
+        }
+
+        function handleFlashcardFeedback(isRemembered) { 
             if (appState.isLoading || !appState.currentUser) return; 
             const deckState = getDeckState(); const currentItem = appState.currentDeck[deckState.currentIndex];
             if (!currentItem) return; 
@@ -707,8 +663,9 @@
                 }
                 updateDisplay(); 
             }
-        };
-        renderQuizChoices = function(currentItem) { /* ... same ... */ 
+        }
+
+        function renderQuizChoices(currentItem) { 
             el.quizChoicesArea.innerHTML = ''; 
             const correctAnswerLang = appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th;
             let choices = [correctAnswerLang];
@@ -722,11 +679,12 @@
                 const choiceButton = document.createElement('button');
                 choiceButton.className = 'btn btn-theme-outline w-full text-left p-3 quiz-choice';
                 choiceButton.textContent = choiceText;
-                choiceButton.onclick = () => handleQuizAnswer(choiceText === correctAnswerLang, choiceButton, correctAnswerLang);
+                choiceButton.onclick = () => handleQuizAnswer(choiceText === correctAnswerLang, choiceButton, correctAnswerText);
                 el.quizChoicesArea.appendChild(choiceButton);
             });
-        };
-        handleQuizAnswer = function(isCorrect, clickedButton, correctAnswerText) { /* ... (uses saveDeckStateToFirestore) ... */ 
+        }
+
+        function handleQuizAnswer(isCorrect, clickedButton, correctAnswerText) { 
             const deckState = getDeckState();
             if (deckState.quizAnsweredCurrent || appState.isLoading || !appState.currentUser) return; 
             deckState.quizAnsweredCurrent = true; deckState.quizAttempts++;
@@ -774,8 +732,9 @@
                 }
                  updateDisplay(); 
             }
-        };
-        goToNextItem = function() { /* ... same ... */ 
+        }
+
+        function goToNextItem() { 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex < appState.currentDeck.length - 1) {
@@ -784,16 +743,18 @@
             } else if (appState.currentDeck.length > 0) { 
                 showMessage("You've reached the end of the deck!", "info");
             }
-        };
-        goToPrevItem = function() { /* ... same ... */ 
+        }
+
+        function goToPrevItem() { 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex > 0) {
                 deckState.currentIndex--; appState.isFlashcardFlipped = false;
                 deckState.quizAnsweredCurrent = false; updateDisplay();
             }
-        };
-        setupDOMReferences = function() { /* ... same ... */ 
+        }
+        
+        function setupDOMReferences() { 
             el.authArea = document.getElementById('authArea');
             el.appArea = document.getElementById('appArea');
             el.deckActionsArea = document.getElementById('deckActionsArea');
@@ -859,8 +820,9 @@
             el.messageBox = document.getElementById('messageBox');
             el.toggleControlsBtn = document.getElementById('toggleControlsBtn');
             el.controlPanel = document.getElementById('controlPanel'); 
-        };
-        function setupAuthEventListeners() { /* ... (same as v1.7, added specific error for email-already-in-use) ... */ 
+        }
+
+        function setupAuthEventListeners() { 
              el.loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
@@ -911,7 +873,8 @@
                 el.loginFormContainer.classList.remove('hidden');
             });
         }
-        function updateUIForAuthState(user) { /* ... same as v1.7 ... */ 
+
+        function updateUIForAuthState(user) { 
             if (user) {
                 el.authArea.classList.add('hidden');
                 el.appArea.style.display = 'flex'; 
@@ -934,7 +897,8 @@
                 if(el.learnedDeckCount) el.learnedDeckCount.textContent = 'Learned: 0';
             }
         }
-        function setupAppEventListeners() { /* ... same as v1.7 (uses saveDeckStateToFirestore, resetUserProgressInFirestore) ... */ 
+
+        function setupAppEventListeners() { 
             el.deckWordsBtn.addEventListener('click', async () => {
                 if (appState.isLoading || appState.deckSource === 'words') return;
                 appState.deckSource = 'words';
@@ -1003,12 +967,57 @@
         // --- APP START ---
         async function startApp() {
             console.log("App starting...");
-            setupDOMReferences(); 
+            setupDOMReferences(); // CRITICAL: Call this first to initialize 'el' object
+
+            // --- Firebase Configuration and Initialization ---
+            let userProvidedConfig = { // Your provided config
+                apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
+                authDomain: "lingualflow-eecd2.firebaseapp.com",
+                projectId: "lingualflow-eecd2",
+                storageBucket: "lingualflow-eecd2.firebasestorage.app",
+                messagingSenderId: "337589259202",
+                appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b",
+                measurementId: "G-3DCPWXRZG3"
+            };
+
+            // Use __firebase_config if available (Canvas environment), otherwise use userProvidedConfig
+            if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
+                try {
+                    currentFirebaseConfig = JSON.parse(__firebase_config);
+                    if (!currentFirebaseConfig.apiKey || !currentFirebaseConfig.projectId) {
+                        throw new Error("Firebase config from __firebase_config is missing essential fields.");
+                    }
+                    currentAppId = currentFirebaseConfig.appId || (typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-from-env');
+                } catch (e) {
+                    console.error("Error parsing __firebase_config:", e, ". Falling back to user-provided config.");
+                    currentFirebaseConfig = userProvidedConfig;
+                    currentAppId = currentFirebaseConfig.appId || 'hanziflow-user-config';
+                    showMessage("Using manually set Firebase config due to environment config error.", "info");
+                }
+            } else { 
+                currentFirebaseConfig = userProvidedConfig;
+                currentAppId = currentFirebaseConfig.appId || 'hanziflow-user-config';
+                console.warn("Using manually set Firebase config as __firebase_config is not defined.");
+            }
+            
+            try {
+                firebaseApp = initializeApp(currentFirebaseConfig);
+                auth = getAuth(firebaseApp);
+                db = getFirestore(firebaseApp);
+                console.log("Firebase Initialized. Project ID:", currentFirebaseConfig.projectId, "App ID for Firestore:", currentAppId);
+            } catch (error) {
+                console.error("CRITICAL: Error initializing Firebase services:", error);
+                showMessage("Could not initialize Firebase. App cannot function.", "error", 30000);
+                updateUIForAuthState(null); 
+                return; 
+            }
+            // --- End of Firebase Configuration and Initialization ---
+
             setupAuthEventListeners(); 
             setupAppEventListeners(); 
 
-            if (!auth || !db) {
-                 showMessage("Firebase not properly initialized. Cannot proceed.", "error", 10000);
+            if (!auth || !db) { 
+                 showMessage("Firebase services not available. Cannot proceed.", "error", 10000);
                  updateUIForAuthState(null); 
                  return;
             }
@@ -1029,21 +1038,20 @@
                 }
             });
             
-            // Check if the provided config seems like placeholders
-            if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE" || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+            if (currentFirebaseConfig.apiKey === "YOUR_API_KEY_HERE" || currentFirebaseConfig.projectId === "YOUR_PROJECT_ID") {
                 updateUIForAuthState(null); 
                 showMessage("Firebase is not configured with your project details. Please update the firebaseConfig in the script.", "error", 15000);
                 return; 
             }
 
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && auth) {
                 try {
                     await signInWithCustomToken(auth, __initial_auth_token);
                     console.log("Signed in with custom token.");
                 } catch (error) {
                     console.error("Error signing in with custom token:", error);
                 }
-            } else if (!auth.currentUser) { 
+            } else if (auth && !auth.currentUser) { 
                 console.log("No initial auth token, user needs to login/signup via form.");
             }
         }
