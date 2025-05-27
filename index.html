@@ -221,7 +221,7 @@
                 <div id="accuracyBar" class="bar-fill"></div>
             </div>
         </div>
-         <p class="text-xs text-center mt-4">HanziFlow v1.8 - Local Storage</p>
+         <p class="text-xs text-center mt-4">HanziFlow v1.8 - Local Storage (Persistent Index)</p>
     </footer>
 
     <script>
@@ -251,7 +251,6 @@
             isFlashcardFlipped: false,
             controlPanelOpen: false,
             isLoading: false,
-            // No currentUser or userId needed for localStorage version
         };
 
         const el = {}; 
@@ -317,25 +316,22 @@
                 const learnedKey = `hanziflow_learnedIds_${source}`;
                 const quizAttemptsKey = `hanziflow_quizAttempts_${source}`;
                 const quizCorrectKey = `hanziflow_quizCorrect_${source}`;
+                const currentIndexKey = `hanziflow_currentIndex_${source}`; // Key for current index
 
                 const storedReviewIds = localStorage.getItem(reviewKey);
                 const storedLearnedIds = localStorage.getItem(learnedKey);
                 const storedQuizAttempts = localStorage.getItem(quizAttemptsKey);
                 const storedQuizCorrect = localStorage.getItem(quizCorrectKey);
+                const storedCurrentIndex = localStorage.getItem(currentIndexKey);
 
-                appState.progress[source] = { // Initialize with defaults first
-                    currentIndex: 0, 
-                    quizAttempts: 0, 
-                    quizCorrect: 0, 
-                    reviewIds: new Set(), 
-                    learnedIds: new Set(), 
-                    quizAnsweredCurrent: false
+                appState.progress[source] = { 
+                    currentIndex: storedCurrentIndex ? parseInt(storedCurrentIndex, 10) : 0, // Load or default to 0
+                    quizAttempts: storedQuizAttempts ? parseInt(storedQuizAttempts, 10) : 0, 
+                    quizCorrect: storedQuizCorrect ? parseInt(storedQuizCorrect, 10) : 0, 
+                    reviewIds: storedReviewIds ? new Set(JSON.parse(storedReviewIds)) : new Set(), 
+                    learnedIds: storedLearnedIds ? new Set(JSON.parse(storedLearnedIds)) : new Set(), 
+                    quizAnsweredCurrent: false // Always reset this for a new session view
                 };
-
-                if (storedReviewIds) appState.progress[source].reviewIds = new Set(JSON.parse(storedReviewIds));
-                if (storedLearnedIds) appState.progress[source].learnedIds = new Set(JSON.parse(storedLearnedIds));
-                if (storedQuizAttempts) appState.progress[source].quizAttempts = parseInt(storedQuizAttempts, 10) || 0;
-                if (storedQuizCorrect) appState.progress[source].quizCorrect = parseInt(storedQuizCorrect, 10) || 0;
             });
         }
 
@@ -346,7 +342,8 @@
             localStorage.setItem(`hanziflow_learnedIds_${source}`, JSON.stringify(Array.from(deckState.learnedIds)));
             localStorage.setItem(`hanziflow_quizAttempts_${source}`, deckState.quizAttempts.toString());
             localStorage.setItem(`hanziflow_quizCorrect_${source}`, deckState.quizCorrect.toString());
-            console.log(`Progress for ${source} saved to localStorage.`);
+            localStorage.setItem(`hanziflow_currentIndex_${source}`, deckState.currentIndex.toString()); // Save current index
+            console.log(`Progress for ${source} (including index ${deckState.currentIndex}) saved to localStorage.`);
         }
         
         function resetProgressInLocalStorage(deckSourceToReset) {
@@ -354,6 +351,7 @@
             localStorage.removeItem(`hanziflow_learnedIds_${deckSourceToReset}`);
             localStorage.removeItem(`hanziflow_quizAttempts_${deckSourceToReset}`);
             localStorage.removeItem(`hanziflow_quizCorrect_${deckSourceToReset}`);
+            localStorage.removeItem(`hanziflow_currentIndex_${deckSourceToReset}`); // Also remove saved index
             console.log(`Progress for ${deckSourceToReset} reset in localStorage.`);
         }
 
@@ -369,8 +367,6 @@
             appState.masterDeck = await fetchCSVData(url, idPrefix);
             shuffleArray(appState.masterDeck); 
             
-            // Progress is already loaded by loadProgressFromLocalStorage at app start
-            
             appState.isLoading = false;
             setLoadingState(false);
 
@@ -379,15 +375,19 @@
             }
             
             const currentDeckState = getDeckState();
-            currentDeckState.currentIndex = 0; 
-            currentDeckState.quizAnsweredCurrent = false; 
+            // currentDeckState.currentIndex is now loaded by loadProgressFromLocalStorage
+            currentDeckState.quizAnsweredCurrent = false; // Reset for new view/session
             
             filterAndSetCurrentDeck(); 
+            // Ensure currentIndex is valid after filtering (e.g., if deck became shorter)
+            if (currentDeckState.currentIndex >= appState.currentDeck.length) {
+                currentDeckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
+            }
             updateDisplay();
         }
         
         // --- UI State Updates ---
-        function setLoadingState(isLoading) { /* ... same as v1.7 ... */ 
+        function setLoadingState(isLoading) { /* ... same as v1.8 ... */ 
             appState.isLoading = isLoading;
             const loadingText = "Loading..."; 
             if (isLoading) {
@@ -416,7 +416,7 @@
                  updateDisplay(); 
             }
         }
-        function filterAndSetCurrentDeck() { /* ... same as v1.7 ... */ 
+        function filterAndSetCurrentDeck() { /* ... same as v1.8 ... */ 
             const deckState = getDeckState();
             let deckToUse = [];
 
@@ -442,7 +442,7 @@
                 showMessage(`${viewName} deck is empty.`, "info");
             }
         }
-        function updateDisplay() { /* ... same as v1.7 ... */ 
+        function updateDisplay() { /* ... same as v1.8 ... */ 
             if (!el.deckWordsBtn) return; 
 
             updateToggleButtonStates();
@@ -502,7 +502,7 @@
                 }
             }
         }
-        function updateToggleButtonStates() { /* ... same as v1.7 ... */ 
+        function updateToggleButtonStates() { /* ... same as v1.8 ... */ 
             el.deckWordsBtn.classList.toggle('active', appState.deckSource === 'words');
             el.deckSentencesBtn.classList.toggle('active', appState.deckSource === 'sentences');
             el.modeFlashcardBtn.classList.toggle('active', appState.currentMode === 'flashcard');
@@ -523,7 +523,7 @@
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-5', appState.autoAdvance);
             el.autoAdvanceToggleKnob.classList.toggle('translate-x-1', !appState.autoAdvance);
         }
-        function updateModeVisibility() { /* ... same as v1.7 ... */ 
+        function updateModeVisibility() { /* ... same as v1.8 ... */ 
             const isFlashcard = appState.currentMode === 'flashcard';
             el.flashcardModeDiv.classList.toggle('hidden', !isFlashcard);
             el.quizModeDiv.classList.toggle('hidden', isFlashcard);
@@ -532,7 +532,7 @@
             
             if (!appState.isLoading) getDeckState().quizAnsweredCurrent = false; 
         }
-        function updateNavigationButtons() { /* ... same as v1.7 ... */ 
+        function updateNavigationButtons() { /* ... same as v1.8 ... */ 
             el.navigationButtons.classList.toggle('hidden', appState.autoAdvance || appState.isLoading);
             const deckState = getDeckState();
             if (appState.currentDeck.length === 0 || appState.isLoading) {
@@ -542,7 +542,7 @@
                 el.nextBtn.disabled = deckState.currentIndex === appState.currentDeck.length - 1;
             }
         }
-        function updateProgressAndAccuracy() { /* ... same as v1.7 ... */ 
+        function updateProgressAndAccuracy() { /* ... same as v1.8 ... */ 
             const deckState = getDeckState();
             const totalItems = appState.currentDeck.length;
             const reviewedItems = totalItems > 0 ? deckState.currentIndex + 1 : 0;
@@ -560,12 +560,12 @@
                  el.accuracyBar.style.width = '0%';
             }
         }
-        function updateStatusCounts() { /* ... same as v1.7 ... */ 
+        function updateStatusCounts() { /* ... same as v1.8 ... */ 
             const deckState = getDeckState();
             el.reviewDeckCount.textContent = `Review: ${deckState.reviewIds.size}`;
             el.learnedDeckCount.textContent = `Learned: ${deckState.learnedIds.size}`;
         }
-        function flipCard() { /* ... same as v1.7 ... */ 
+        function flipCard() { /* ... same as v1.8 ... */ 
             if (appState.isLoading || appState.currentDeck.length === 0) return;
             appState.isFlashcardFlipped = !appState.isFlashcardFlipped;
             el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
@@ -616,7 +616,7 @@
                 updateDisplay(); 
             }
         }
-        function renderQuizChoices(currentItem) { /* ... same as v1.7 ... */ 
+        function renderQuizChoices(currentItem) { /* ... same as v1.8 ... */ 
             el.quizChoicesArea.innerHTML = ''; 
             const correctAnswerLang = appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th;
             let choices = [correctAnswerLang];
@@ -686,7 +686,7 @@
                  updateDisplay(); 
             }
         }
-        function goToNextItem() { /* ... same as v1.7 ... */ 
+        function goToNextItem() { /* ... same as v1.8 ... */ 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex < appState.currentDeck.length - 1) {
@@ -698,7 +698,7 @@
                 showMessage("You've reached the end of the deck!", "info");
             }
         }
-        function goToPrevItem() { /* ... same as v1.7 ... */ 
+        function goToPrevItem() { /* ... same as v1.8 ... */ 
             if (appState.isLoading) return;
             const deckState = getDeckState();
             if (deckState.currentIndex > 0) {
@@ -708,8 +708,7 @@
                 updateDisplay();
             }
         }
-        function setupDOMReferences() { /* ... same as v1.7, but no auth elements ... */ 
-            // No Auth elements
+        function setupDOMReferences() { /* ... same as v1.8, but no auth elements ... */ 
             el.appArea = document.getElementById('appArea');
             el.deckActionsArea = document.getElementById('deckActionsArea');
             el.footerArea = document.getElementById('footerArea');
@@ -765,7 +764,7 @@
             el.controlPanel = document.getElementById('controlPanel'); 
         }
         
-        function setupAppEventListeners() { /* ... same as v1.7, but resetProgressBtn uses localStorage ... */ 
+        function setupAppEventListeners() { /* ... same as v1.8, but resetProgressBtn uses localStorage ... */ 
             el.deckWordsBtn.addEventListener('click', async () => {
                 if (appState.isLoading || appState.deckSource === 'words') return;
                 appState.deckSource = 'words';
@@ -798,13 +797,13 @@
                 showMessage("Current deck view shuffled!", "success", 1500); updateDisplay();
             });
 
-            el.resetProgressBtn.addEventListener('click', () => { // No async, no currentUser check
+            el.resetProgressBtn.addEventListener('click', () => { 
                 if (appState.isLoading) return;
                 const userConfirmed = window.confirm("Are you sure you want to reset all progress for this deck source (Words/Sentences)? This will clear learned items, review items, and quiz scores from this browser.");
                 if (!userConfirmed) return;
 
                 const deckSourceToReset = appState.deckSource;
-                resetProgressInLocalStorage(deckSourceToReset); // Use localStorage version
+                resetProgressInLocalStorage(deckSourceToReset); 
                 
                 appState.progress[deckSourceToReset] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
                 
@@ -843,7 +842,7 @@
         async function startApp() {
             console.log("App starting with Local Storage...");
             setupDOMReferences(); 
-            loadProgressFromLocalStorage(); // Load from localStorage instead of waiting for auth
+            loadProgressFromLocalStorage(); 
             setupAppEventListeners(); 
             await initializeDeck(); 
             showMessage("Welcome to HanziFlow!", "info", 2000);
