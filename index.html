@@ -275,13 +275,18 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
-        // IMPORTANT: 
-        // 1. Replace placeholders below with your actual Firebase project configuration
-        //    if not running in an environment that provides __firebase_config.
-        // 2. In your Firebase Console > Authentication > Sign-in method:
-        //    ENABLE "Email/Password" provider for manual signup/login to work.
+        let firebaseConfigFromUser = {
+            apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
+            authDomain: "lingualflow-eecd2.firebaseapp.com",
+            projectId: "lingualflow-eecd2",
+            storageBucket: "lingualflow-eecd2.appspot.com", // Corrected: .appspot.com
+            messagingSenderId: "337589259202",
+            appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b",
+            measurementId: "G-3DCPWXRZG3" // measurementId is optional for Auth/Firestore
+        };
+
         let firebaseConfig;
-        let appId = typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-default-app'; // Default app ID
+        let appId = typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-default-app'; 
 
         if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
             try {
@@ -289,30 +294,17 @@
                 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
                     throw new Error("Firebase config from __firebase_config is missing essential fields (apiKey, projectId).");
                 }
-                 appId = firebaseConfig.appId || appId; // Prefer appId from config if available
+                 appId = firebaseConfig.appId || appId; 
             } catch (e) {
                 console.error("Error parsing __firebase_config:", e);
-                // Fallback to clearly invalid placeholders if parsing fails
-                firebaseConfig = { apiKey: "INVALID_CONFIG_JSON", authDomain: "", projectId: "INVALID_CONFIG_JSON", appId: "" };
+                firebaseConfig = firebaseConfigFromUser; // Fallback to user-provided if __firebase_config fails
+                appId = firebaseConfig.appId || appId;
+                showMessage("Using provided Firebase config due to __firebase_config error.", "info");
             }
         } else {
-            // Fallback / Placeholder Configuration (REPLACE THESE WITH YOUR ACTUAL CONFIG)
-            console.warn("Using placeholder Firebase config. Replace with your project's config for live functionality.");
-            firebaseConfig = {
-                apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
-                authDomain: "lingualflow-eecd2.firebaseapp.com",
-                projectId: "lingualflow-eecd2",
-                storageBucket: "lingualflow-eecd2.firebasestorage.app",
-                messagingSenderId: "337589259202",
-                appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b" // Can be the same as your web app ID in Firebase
-            };
-             // If running locally, ensure appId is set for Firestore paths
-            if (appId === 'hanziflow-default-app' && firebaseConfig.appId && firebaseConfig.appId !== "YOUR_APP_ID") {
-                appId = firebaseConfig.appId;
-            } else if (appId === 'hanziflow-default-app' && firebaseConfig.projectId !== "YOUR_PROJECT_ID") {
-                // Try to construct a unique enough app ID if only projectId is available
-                appId = `hanziflow-${firebaseConfig.projectId}`;
-            }
+            firebaseConfig = firebaseConfigFromUser;
+            appId = firebaseConfig.appId || appId;
+            console.warn("Using user-provided Firebase config as __firebase_config is not defined.");
         }
         
         // Initialize Firebase
@@ -328,7 +320,6 @@
         } catch (error) {
             console.error("Error initializing Firebase:", error);
             showMessage("Could not initialize Firebase. App features requiring Firebase will not work.", "error", 10000);
-            // You might want to disable parts of the UI or show a persistent error message
         }
 
 
@@ -418,7 +409,7 @@
         }
 
         async function loadUserProgressFromFirestore() {
-            if (!appState.userId || !db) { // Check if db is initialized
+            if (!appState.userId || !db) { 
                 console.log("No user ID or Firestore DB not initialized, cannot load progress.");
                 appState.progress.words = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
                 appState.progress.sentences = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false };
@@ -458,7 +449,6 @@
             }
             const deckState = getDeckState();
             const source = appState.deckSource;
-            // Ensure appId is valid before creating docRef
             if (!appId || appId.includes("YOUR_") || appId.includes("MISSING_") || appId.includes("INVALID_")) {
                 console.error("Invalid appId for Firestore path:", appId, "Cannot save progress.");
                 showMessage("Error: App ID for database is not configured correctly.", "error");
@@ -547,7 +537,7 @@
         setLoadingState = function(isLoading) {
             appState.isLoading = isLoading;
             const loadingText = "Loading...";
-            if (!el.flashcardChar || !el.quizChar) return; // Ensure DOM elements are ready
+            if (!el.flashcardChar || !el.quizChar) return; 
 
             if (isLoading) {
                 if (appState.currentMode === 'flashcard') {
@@ -563,7 +553,7 @@
                 document.querySelectorAll('#appArea button, #deckActionsArea button, #controlPanel button').forEach(btn => btn.disabled = false);
                 if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.currentDeck.length === 0;
             }
-            if(el.flashcardChar) updateDisplay(); // Refresh UI
+            if(el.flashcardChar) updateDisplay(); 
         };
         filterAndSetCurrentDeck = function() {
             const deckState = getDeckState(); let deckToUse = [];
@@ -924,7 +914,7 @@
         function updateUIForAuthState(user) { /* ... same as v1.7 ... */ 
             if (user) {
                 el.authArea.classList.add('hidden');
-                el.appArea.style.display = 'flex'; // Use flex for the main layout
+                el.appArea.style.display = 'flex'; 
                 el.deckActionsArea.style.display = 'flex';
                 el.footerArea.style.display = 'block'; 
                 el.authStatus.textContent = `Logged in as: ${user.email || 'User'}`;
@@ -1019,10 +1009,9 @@
 
             if (!auth || !db) {
                  showMessage("Firebase not properly initialized. Cannot proceed.", "error", 10000);
-                 updateUIForAuthState(null); // Ensure login form is shown
+                 updateUIForAuthState(null); 
                  return;
             }
-
 
             onAuthStateChanged(auth, async (user) => {
                 appState.currentUser = user;
@@ -1040,9 +1029,10 @@
                 }
             });
             
-            if (firebaseConfig.apiKey === "MISSING_CONFIG" || firebaseConfig.apiKey === "INVALID_CONFIG" || firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+            // Check if the provided config seems like placeholders
+            if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE" || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
                 updateUIForAuthState(null); 
-                showMessage("Firebase is not configured correctly with your project details. Please update the firebaseConfig in the script.", "error", 15000);
+                showMessage("Firebase is not configured with your project details. Please update the firebaseConfig in the script.", "error", 15000);
                 return; 
             }
 
