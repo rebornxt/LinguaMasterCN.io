@@ -529,48 +529,506 @@
         const el = {}; 
 
         // --- UTILITY FUNCTIONS ---
-        const shuffleArray = (array) => { /* ... same ... */ };
-        const showMessage = (text, type = 'info', duration = 3000) => { /* ... same ... */ };
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        };
+        const showMessage = (text, type = 'info', duration = 3000) => {
+            if (el.messageBox) { 
+                el.messageBox.textContent = text;
+                el.messageBox.className = ''; 
+                el.messageBox.classList.add('show', type);
+                setTimeout(() => {
+                    el.messageBox.classList.remove('show');
+                }, duration);
+            } else {
+                console.log(`Message (${type}): ${text}`); 
+            }
+        };
         
         // --- DATA FETCHING AND PARSING (from CSV) ---
-        const fetchCSVData = async (url, idPrefix) => { /* ... same ... */ };
-        const parseCSVToObjects = (csvText, idPrefix) => { /* ... same ... */ };
+        const fetchCSVData = async (url, idPrefix) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Network response: ${response.statusText}`);
+                const csvText = await response.text();
+                return parseCSVToObjects(csvText, idPrefix);
+            } catch (error) {
+                console.error('Failed to fetch/parse CSV:', error);
+                showMessage(`Error loading master deck: ${error.message}`, 'error', 5000);
+                return [];
+            }
+        };
+        const parseCSVToObjects = (csvText, idPrefix) => {
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length <= 1) return []; 
+            const dataObjects = [];
+            for (let i = 1; i < lines.length; i++) { 
+                if (lines[i].trim() === '') continue; 
+                const values = lines[i].split(','); 
+                if (values.length >= 5) { 
+                    dataObjects.push({
+                        id: `${idPrefix}${i}`, 
+                        s: values[0]?.trim()||'', t: values[1]?.trim()||'', 
+                        p: values[2]?.trim()||'', en: values[3]?.trim()||'', 
+                        th: values[4]?.trim()||''
+                    });
+                } else console.warn(`Skipping malformed CSV line ${i+1}: ${lines[i]}`);
+            }
+            return dataObjects;
+        };
         
         // --- PROGRESS DATA HANDLING (Conditional: Firestore or LocalStorage) ---
         const getDeckState = () => appState.progress[appState.deckSource];
-        const loadProgress = async () => { /* ... same ... */ };
-        const saveProgress = async () => { /* ... same ... */ };
-        const resetProgress = async () => { /* ... same ... */ };
+        const loadProgress = async () => {
+            if (appState.isAnonymousUser) {
+                loadProgressFromLocalStorage();
+            } else if (appState.userId && db) { 
+                await loadUserProgressFromFirestore();
+            } else { 
+                console.log("No user or DB not ready, resetting local progress state.");
+                appState.progress.words = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null };
+                appState.progress.sentences = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null };
+            }
+        };
+        const saveProgress = async () => {
+            if (appState.isAnonymousUser) {
+                saveDeckStateToLocalStorage();
+            } else if (appState.userId && db) {
+                await saveDeckStateToFirestore();
+            }
+        };
+        const resetProgress = async () => {
+            const deckSourceToReset = appState.deckSource;
+            if (appState.isAnonymousUser) {
+                resetProgressInLocalStorage(deckSourceToReset);
+            } else if (appState.userId && db) {
+                await resetUserProgressInFirestore(deckSourceToReset);
+            }
+            appState.progress[deckSourceToReset] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null };
+            filterAndSetCurrentDeck(); 
+            showMessage(`Progress for ${deckSourceToReset} deck has been reset.`, "info");
+            updateDisplay();
+        };
 
         // --- LocalStorage Specific Functions ---
-        const loadProgressFromLocalStorage = () => { /* ... same ... */ };
-        const saveDeckStateToLocalStorage = () => { /* ... same ... */ };
-        const resetProgressInLocalStorage = (deckSourceToReset) => { /* ... same ... */ };
+        const loadProgressFromLocalStorage = () => {
+            console.log("Loading progress from localStorage for anonymous user.");
+            ['words', 'sentences'].forEach(source => {
+                const reviewKey = `hanziflow_anon_reviewIds_${source}`;
+                const learnedKey = `hanziflow_anon_learnedIds_${source}`;
+                const quizAttemptsKey = `hanziflow_anon_quizAttempts_${source}`;
+                const quizCorrectKey = `hanziflow_anon_quizCorrect_${source}`;
+                const currentIndexKey = `hanziflow_anon_currentIndex_${source}`;
+
+                const storedReviewIds = localStorage.getItem(reviewKey);
+                const storedLearnedIds = localStorage.getItem(learnedKey);
+                const storedQuizAttempts = localStorage.getItem(quizAttemptsKey);
+                const storedQuizCorrect = localStorage.getItem(quizCorrectKey);
+                const storedCurrentIndex = localStorage.getItem(currentIndexKey);
+
+                appState.progress[source] = { 
+                    currentIndex: storedCurrentIndex ? parseInt(storedCurrentIndex, 10) : 0,
+                    quizAttempts: storedQuizAttempts ? parseInt(storedQuizAttempts, 10) : 0, 
+                    quizCorrect: storedQuizCorrect ? parseInt(storedQuizCorrect, 10) : 0, 
+                    reviewIds: storedReviewIds ? new Set(JSON.parse(storedReviewIds)) : new Set(), 
+                    learnedIds: storedLearnedIds ? new Set(JSON.parse(storedLearnedIds)) : new Set(), 
+                    quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null
+                };
+            });
+        };
+        const saveDeckStateToLocalStorage = () => {
+            const deckState = getDeckState();
+            const source = appState.deckSource;
+            localStorage.setItem(`hanziflow_anon_reviewIds_${source}`, JSON.stringify(Array.from(deckState.reviewIds)));
+            localStorage.setItem(`hanziflow_anon_learnedIds_${source}`, JSON.stringify(Array.from(deckState.learnedIds)));
+            localStorage.setItem(`hanziflow_anon_quizAttempts_${source}`, deckState.quizAttempts.toString());
+            localStorage.setItem(`hanziflow_anon_quizCorrect_${source}`, deckState.quizCorrect.toString());
+            localStorage.setItem(`hanziflow_anon_currentIndex_${source}`, deckState.currentIndex.toString());
+            console.log(`Anonymous progress for ${source} (index ${deckState.currentIndex}) saved to localStorage.`);
+        };
+        const resetProgressInLocalStorage = (deckSourceToReset) => {
+            localStorage.removeItem(`hanziflow_anon_reviewIds_${deckSourceToReset}`);
+            localStorage.removeItem(`hanziflow_anon_learnedIds_${deckSourceToReset}`);
+            localStorage.removeItem(`hanziflow_anon_quizAttempts_${deckSourceToReset}`);
+            localStorage.removeItem(`hanziflow_anon_quizCorrect_${deckSourceToReset}`);
+            localStorage.removeItem(`hanziflow_anon_currentIndex_${deckSourceToReset}`);
+            console.log(`Anonymous progress for ${deckSourceToReset} reset in localStorage.`);
+        };
 
         // --- Firestore Specific Functions ---
-        const loadUserProgressFromFirestore = async () => { /* ... same ... */ };
-        const saveDeckStateToFirestore = async () => { /* ... same ... */ };
-        const resetUserProgressInFirestore = async (deckSourceToReset) => { /* ... same ... */ };
+        const loadUserProgressFromFirestore = async () => {
+            if (!appState.userId || !db || appState.isAnonymousUser) { 
+                console.log("Skipping Firestore load: No user ID, DB not init, or anonymous user.");
+                return;
+            }
+            console.log("Loading progress from Firestore for user:", appState.userId);
+            for (const source of ['words', 'sentences']) {
+                const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", source);
+                try {
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        appState.progress[source] = {
+                            currentIndex: 0, 
+                            quizAttempts: data.quizAttempts || 0, quizCorrect: data.quizCorrect || 0,
+                            reviewIds: new Set(data.reviewIds || []), learnedIds: new Set(data.learnedIds || []),
+                            quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null
+                        };
+                    } else {
+                        appState.progress[source] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null };
+                    }
+                } catch (error) {
+                    console.error(`Error loading Firestore progress for ${source}:`, error);
+                    showMessage(`Error loading your progress for ${source}.`, 'error');
+                    appState.progress[source] = { currentIndex: 0, quizAttempts: 0, quizCorrect: 0, reviewIds: new Set(), learnedIds: new Set(), quizAnsweredCurrent: false, currentQuizChoices: [], currentQuizItemId: null };
+                }
+            }
+        };
+        const saveDeckStateToFirestore = async () => {
+            if (!appState.userId || !db || appState.isAnonymousUser) {
+                console.warn("Skipping Firestore save: No user ID, DB not init, or anonymous user.");
+                return;
+            }
+            const deckState = getDeckState();
+            const source = appState.deckSource;
+            if (!currentAppId || currentAppId.includes("YOUR_") || currentAppId.includes("MISSING_") || currentAppId.includes("INVALID_")) {
+                console.error("Invalid currentAppId for Firestore path:", currentAppId, "Cannot save progress.");
+                showMessage("Error: App ID for database is not configured correctly.", "error");
+                return;
+            }
+            const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", source);
+            const dataToSave = {
+                quizAttempts: deckState.quizAttempts, quizCorrect: deckState.quizCorrect,
+                reviewIds: Array.from(deckState.reviewIds), learnedIds: Array.from(deckState.learnedIds)
+            };
+            try {
+                await setDoc(docRef, dataToSave, { merge: true }); 
+                console.log(`Progress for ${source} saved to Firestore.`);
+            } catch (error) {
+                console.error(`Error saving progress for ${source}:`, error);
+                showMessage(`Error saving your progress.`, 'error');
+            }
+        };
+        const resetUserProgressInFirestore = async (deckSourceToReset) => {
+            if (!appState.userId || !db || appState.isAnonymousUser) return;
+            if (!currentAppId || currentAppId.includes("YOUR_") || currentAppId.includes("MISSING_") || currentAppId.includes("INVALID_")) {
+                console.error("Invalid currentAppId for Firestore path:", currentAppId, "Cannot reset progress.");
+                return;
+            }
+            const docRef = doc(db, "artifacts", currentAppId, "users", appState.userId, "progress", deckSourceToReset);
+            try {
+                await setDoc(docRef, {
+                    quizAttempts: 0, quizCorrect: 0, reviewIds: [], learnedIds: []
+                });
+                console.log(`Progress for ${deckSourceToReset} reset in Firestore.`);
+            } catch (error) {
+                console.error(`Error resetting progress for ${deckSourceToReset}:`, error);
+                showMessage(`Error resetting progress.`, 'error');
+            }
+        };
 
         // --- INITIALIZATION AND DATA LOADING ---
-        const initializeDeck = async () => { /* ... same ... */ };
+        const initializeDeck = async () => { 
+            appState.isLoading = true;
+            setLoadingState(true);
+            
+            const url = DATA_URLS[appState.deckSource];
+            const idPrefix = appState.deckSource === 'words' ? 'w' : 's';
+            
+            appState.masterDeck = await fetchCSVData(url, idPrefix);
+            shuffleArray(appState.masterDeck); 
+            
+            appState.isLoading = false;
+            setLoadingState(false);
+
+            if (appState.masterDeck.length === 0 && url) { 
+                 showMessage(`No items found in ${appState.deckSource} deck. Check data source.`, 'error', 5000);
+            }
+            
+            const currentDeckState = getDeckState();
+            currentDeckState.quizAnsweredCurrent = false; 
+            currentDeckState.currentQuizChoices = []; 
+            currentDeckState.currentQuizItemId = null;
+            
+            filterAndSetCurrentDeck(); 
+            if (currentDeckState.currentIndex >= appState.currentDeck.length && appState.currentDeck.length > 0) {
+                currentDeckState.currentIndex = appState.currentDeck.length - 1;
+            } else if (appState.currentDeck.length === 0) {
+                currentDeckState.currentIndex = 0;
+            }
+            updateDisplay();
+        };
         
         // --- UI State Updates ---
-        const setLoadingState = (isLoading) => { /* ... same ... */ };
-        const filterAndSetCurrentDeck = () => { /* ... same ... */ };
-        const updateFlashcardAnimation = () => { /* ... same ... */ };
-        const updateDisplay = () => { /* ... same ... */ };
-        const updateToggleButtonStates = () => { /* ... same ... */ };
-        const updatePinyinToggleButtonsState = () => { /* ... same ... */ };
-        const updateModeVisibility = () => { /* ... same ... */ };
-        const updateNavigationButtons = () => { /* ... same ... */ };
-        const updateProgressAndAccuracy = () => { /* ... same ... */ };
-        const updateStatusCounts = () => { /* ... same ... */ };
+        const setLoadingState = (isLoading) => {
+            appState.isLoading = isLoading;
+            const loadingText = "Loading...";
+            if (!el.flashcardChar || !el.quizChar) return; 
+
+            if (isLoading) {
+                if (appState.currentMode === 'flashcard') {
+                    el.flashcardChar.textContent = loadingText; el.flashcardChar.classList.add('loading-placeholder');
+                    el.flashcardPinyin.textContent = ''; el.flashcardEn.textContent = ''; el.flashcardTh.textContent = '';
+                } else {
+                    el.quizChar.textContent = loadingText; el.quizChar.classList.add('loading-placeholder');
+                    el.quizPinyin.textContent = ''; el.quizChoicesArea.innerHTML = '';
+                }
+                 document.querySelectorAll('#appArea button, #deckActionsArea button, #controlPanel button').forEach(btn => btn.disabled = true);
+                 if(el.pinyinToggleFlashcard) el.pinyinToggleFlashcard.disabled = true;
+                 if(el.pinyinToggleQuiz) el.pinyinToggleQuiz.disabled = true;
+                 if(el.languageToggleBtn) el.languageToggleBtn.disabled = true;
+            } else {
+                el.flashcardChar.classList.remove('loading-placeholder'); el.quizChar.classList.remove('loading-placeholder');
+                document.querySelectorAll('#appArea button, #deckActionsArea button, #controlPanel button').forEach(btn => btn.disabled = false);
+                if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.currentDeck.length === 0;
+                if(el.pinyinToggleFlashcard) el.pinyinToggleFlashcard.disabled = false;
+                if(el.pinyinToggleQuiz) el.pinyinToggleQuiz.disabled = false;
+                if(el.languageToggleBtn) el.languageToggleBtn.disabled = false;
+            }
+            if(el.flashcardChar) updateDisplay(); 
+        };
+        const filterAndSetCurrentDeck = () => {
+            const deckState = getDeckState(); let deckToUse = [];
+            if (appState.deckViewType === 'all') deckToUse = [...appState.masterDeck];
+            else if (appState.deckViewType === 'review') {
+                deckToUse = appState.masterDeck.filter(item => deckState.reviewIds.has(item.id)); shuffleArray(deckToUse);
+            } else if (appState.deckViewType === 'unlearned') {
+                deckToUse = appState.masterDeck.filter(item => !deckState.learnedIds.has(item.id)); shuffleArray(deckToUse);
+            }
+            appState.currentDeck = deckToUse;
+            if(el.shuffleDeckBtn) el.shuffleDeckBtn.disabled = appState.isLoading || appState.currentDeck.length === 0;
+            if (deckState.currentIndex >= appState.currentDeck.length) deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
+             if (appState.currentDeck.length === 0) deckState.currentIndex = 0; 
+            if (appState.currentDeck.length === 0 && appState.masterDeck.length > 0) {
+                showMessage(`${appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1)} deck is empty.`, "info");
+            }
+        };
+        const updateFlashcardAnimation = () => {
+            if (el.flashcardInner) { 
+                if (appState.autoAdvance && appState.currentMode === 'flashcard') { 
+                    el.flashcardInner.style.transition = 'none';
+                } else {
+                    el.flashcardInner.style.transition = 'transform 0.5s';
+                }
+            }
+        };
+        const updateDisplay = () => {
+            if (!el.deckWordsBtn) return; 
+            updateUILanguage(); 
+            updateToggleButtonStates(); 
+            updatePinyinToggleButtonsState(); 
+            updateModeVisibility(); 
+            updateNavigationButtons();
+            updateProgressAndAccuracy(); 
+            updateStatusCounts();
+            updateFlashcardAnimation(); 
+            if (appState.isLoading) {
+                if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true;
+                if(el.quizChoicesArea) el.quizChoicesArea.innerHTML = ''; return;
+            }
+            const deckState = getDeckState();
+            if (appState.currentDeck.length === 0) {
+                const msg = `${appState.deckViewType.charAt(0).toUpperCase() + appState.deckViewType.slice(1)} Deck Empty`;
+                if (appState.currentMode === 'flashcard') {
+                    el.flashcardChar.textContent = msg; el.flashcardPinyin.textContent = ''; el.flashcardEn.textContent = '';
+                    el.flashcardTh.textContent = ''; el.flashcardPinyinBack.textContent = '';
+                    el.flashcard.classList.remove('flipped'); appState.isFlashcardFlipped = false;
+                } else {
+                    el.quizChar.textContent = msg; el.quizPinyin.textContent = '';
+                    el.quizChoicesArea.innerHTML = ''; el.quizFeedback.textContent = '';
+                }
+                if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true; return;
+            }
+            if (deckState.currentIndex >= appState.currentDeck.length) deckState.currentIndex = Math.max(0, appState.currentDeck.length - 1);
+            if (deckState.currentIndex < 0 && appState.currentDeck.length > 0) deckState.currentIndex = 0;
+            const currentItem = appState.currentDeck[deckState.currentIndex];
+            if (!currentItem) {
+                el.flashcardChar.textContent = 'Error.'; if(el.prevBtn) el.prevBtn.disabled = true; if(el.nextBtn) el.nextBtn.disabled = true; return;
+            }
+            const charToDisplay = appState.showSimplified ? currentItem.s : currentItem.t;
+            const pinyinToDisplay = appState.showPinyin ? currentItem.p : '';
+            if (appState.currentMode === 'flashcard') {
+                el.flashcardChar.textContent = charToDisplay; el.flashcardPinyin.textContent = pinyinToDisplay;
+                el.flashcardEn.textContent = currentItem.en; el.flashcardTh.textContent = currentItem.th;
+                el.flashcardPinyinBack.textContent = pinyinToDisplay;
+                el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
+            } else { // Quiz Mode
+                el.quizChar.textContent = charToDisplay; el.quizPinyin.textContent = pinyinToDisplay;
+                if (!deckState.quizAnsweredCurrent && 
+                    (deckState.currentQuizItemId !== currentItem.id || deckState.currentQuizChoices.length === 0)) {
+                    renderQuizChoices(currentItem); 
+                } else if (!deckState.quizAnsweredCurrent && 
+                           deckState.currentQuizItemId === currentItem.id && 
+                           deckState.currentQuizChoices.length > 0) {
+                    renderQuizChoices(currentItem, true); 
+                }
+                 if (!deckState.quizAnsweredCurrent) el.quizFeedback.textContent = '';
+            }
+        };
+        const updateToggleButtonStates = () => { 
+            el.deckWordsBtn.classList.toggle('active', appState.deckSource === 'words');
+            el.deckSentencesBtn.classList.toggle('active', appState.deckSource === 'sentences');
+            el.modeFlashcardBtn.classList.toggle('active', appState.currentMode === 'flashcard');
+            el.modeQuizBtn.classList.toggle('active', appState.currentMode === 'quiz');
+            el.charSimplifiedBtn.classList.toggle('active', appState.showSimplified);
+            el.charTraditionalBtn.classList.toggle('active', !appState.showSimplified);
+            el.transEnBtn.classList.toggle('active', appState.quizTranslationLanguage === 'en');
+            el.transThBtn.classList.toggle('active', appState.quizTranslationLanguage === 'th');
+            el.deckAllBtn.classList.toggle('active', appState.deckViewType === 'all');
+            el.deckReviewBtn.classList.toggle('active', appState.deckViewType === 'review');
+            el.deckUnlearnedBtn.classList.toggle('active', appState.deckViewType === 'unlearned');
+            el.autoAdvanceToggle.classList.toggle('bg-[var(--primary-red)]', appState.autoAdvance);
+            el.autoAdvanceToggle.classList.toggle('bg-gray-200', !appState.autoAdvance);
+            el.autoAdvanceToggleKnob.classList.toggle('translate-x-5', appState.autoAdvance);
+            el.autoAdvanceToggleKnob.classList.toggle('translate-x-1', !appState.autoAdvance);
+        };
+        const updatePinyinToggleButtonsState = () => {
+            const isActive = appState.showPinyin;
+            const lang = appState.uiLanguage;
+            const text = isActive ? uiStrings[lang].pinyinOn : uiStrings[lang].pinyinOff;
+            
+            if(el.pinyinToggleFlashcard) {
+                el.pinyinToggleFlashcard.classList.toggle('active', isActive);
+                el.pinyinToggleFlashcard.textContent = text;
+            }
+            if(el.pinyinToggleQuiz) {
+                el.pinyinToggleQuiz.classList.toggle('active', isActive);
+                el.pinyinToggleQuiz.textContent = text;
+            }
+        };
+        const updateModeVisibility = () => { 
+            const isFlashcard = appState.currentMode === 'flashcard';
+            el.flashcardModeDiv.classList.toggle('hidden', !isFlashcard);
+            el.quizModeDiv.classList.toggle('hidden', isFlashcard);
+            el.quizTranslationToggleContainer.classList.toggle('hidden', isFlashcard); 
+            el.accuracyDisplayContainer.classList.toggle('hidden', isFlashcard); 
+            if (!appState.isLoading && appState.currentMode === 'quiz') { 
+                 const deckState = getDeckState();
+            }
+        };
+        const updateNavigationButtons = () => { 
+            el.navigationButtons.classList.toggle('hidden', appState.autoAdvance || appState.isLoading);
+            const deckState = getDeckState();
+            if (appState.currentDeck.length === 0 || appState.isLoading) {
+                el.prevBtn.disabled = true; el.nextBtn.disabled = true;
+            } else {
+                el.prevBtn.disabled = deckState.currentIndex === 0;
+                el.nextBtn.disabled = deckState.currentIndex === appState.currentDeck.length - 1;
+            }
+        };
+        const updateProgressAndAccuracy = () => { 
+            const deckState = getDeckState();
+            const totalItems = appState.currentDeck.length;
+            const reviewedItems = totalItems > 0 ? deckState.currentIndex + 1 : 0;
+            
+            const progressTextKey = uiStrings[appState.uiLanguage].progressLabel || "Progress: {reviewed}/{total}";
+            el.progressText.innerHTML = progressTextKey.replace("{reviewed}", reviewedItems).replace("{total}", totalItems);
+            
+            el.progressBar.style.width = totalItems > 0 ? `${(reviewedItems / totalItems) * 100}%` : '0%';
+            if (appState.currentMode === 'quiz') {
+                const accuracy = deckState.quizAttempts > 0 ? ((deckState.quizCorrect / deckState.quizAttempts) * 100) : 0; 
+                const accuracyTextKey = uiStrings[appState.uiLanguage].accuracyLabel || "Accuracy: {accuracy}";
+                el.accuracyText.innerHTML = accuracyTextKey.replace("{accuracy}", deckState.quizAttempts > 0 ? `${accuracy.toFixed(0)}%` : 'N/A');
+                el.accuracyBar.style.width = `${accuracy}%`;
+            } else {
+                 el.accuracyText.innerHTML = uiStrings[appState.uiLanguage].accuracyLabel.replace("{accuracy}", "N/A");
+                 el.accuracyBar.style.width = '0%';
+            }
+        };
+        const updateStatusCounts = () => { 
+            const deckState = getDeckState();
+            const reviewTextKey = uiStrings[appState.uiLanguage].reviewCountText || "Review: {count}";
+            const learnedTextKey = uiStrings[appState.uiLanguage].learnedCountText || "Learned: {count}";
+            el.reviewDeckCount.textContent = reviewTextKey.replace("{count}", deckState.reviewIds.size);
+            el.learnedDeckCount.textContent = learnedTextKey.replace("{count}", deckState.learnedIds.size);
+        };
 
         // --- CORE LOGIC ---
-        const flipCard = () => { /* ... same ... */ };
-        const handleFlashcardFeedback = (isRemembered) => { /* ... same, uses 1000ms delay ... */ };
-        const renderQuizChoices = (currentItem, reuseStoredChoices = false) => { /* ... same ... */ };
+        const flipCard = () => { 
+            if (appState.isLoading || appState.currentDeck.length === 0) return;
+            appState.isFlashcardFlipped = !appState.isFlashcardFlipped;
+            el.flashcard.classList.toggle('flipped', appState.isFlashcardFlipped);
+        };
+        const handleFlashcardFeedback = (isRemembered) => { 
+            if (appState.isLoading) return; 
+            if (!appState.isAnonymousUser && !appState.currentUser) {
+                showMessage("Please log in to save progress.", "info"); return;
+            }
+            const deckState = getDeckState(); const currentItem = appState.currentDeck[deckState.currentIndex];
+            if (!currentItem) return; 
+            const charText = appState.showSimplified ? currentItem.s : currentItem.t;
+            if (isRemembered) {
+                showMessage(`"${charText}" marked as remembered.`, 'success', 1500);
+                deckState.learnedIds.add(currentItem.id); deckState.reviewIds.delete(currentItem.id); 
+            } else { 
+                showMessage(`"${charText}" added to review.`, 'info', 1500);
+                deckState.reviewIds.add(currentItem.id); deckState.learnedIds.delete(currentItem.id); 
+            }
+            saveProgress(); 
+            updateStatusCounts(); 
+            let deckNeedsRefilter = false;
+            if (appState.deckViewType === 'unlearned' && isRemembered) deckNeedsRefilter = true;
+            else if (appState.deckViewType === 'review' && isRemembered) deckNeedsRefilter = true;
+            if (appState.autoAdvance) {
+                const delay = 1000; 
+                setTimeout(() => {
+                    if (deckNeedsRefilter) { 
+                        const oldIndex = deckState.currentIndex; 
+                        filterAndSetCurrentDeck(); 
+                        if (appState.currentDeck.length > 0) {
+                            deckState.currentIndex = (oldIndex < appState.currentDeck.length) ? oldIndex : Math.max(0, appState.currentDeck.length - 1);
+                            if (deckState.currentIndex < appState.currentDeck.length -1 || (appState.currentDeck.length === 1 && deckState.currentIndex === 0) ) {
+                                if (!(appState.currentDeck.length > 0 && oldIndex === appState.currentDeck.length && isRemembered && appState.deckViewType !== 'all')) {
+                                   goToNextItem();
+                                } else { showMessage("End of filtered deck.", "info"); updateDisplay(); }
+                            } else { showMessage("End of filtered deck.", "info"); updateDisplay(); }
+                        } else { updateDisplay(); }
+                    } else {
+                        goToNextItem();
+                    }
+                }, delay); 
+            } else if (deckNeedsRefilter) { 
+                const oldIndex = deckState.currentIndex; filterAndSetCurrentDeck();
+                if (appState.currentDeck.length > 0) { 
+                    deckState.currentIndex = (oldIndex < appState.currentDeck.length) ? oldIndex : Math.max(0, appState.currentDeck.length - 1);
+                }
+                updateDisplay(); 
+            }
+        };
+        const renderQuizChoices = (currentItem, reuseStoredChoices = false) => { 
+            const deckState = getDeckState(); 
+            console.log("[renderQuizChoices] Called. quizAnsweredCurrent:", deckState.quizAnsweredCurrent, "reuseStored:", reuseStoredChoices, "storedChoices:", deckState.currentQuizChoices);
+            el.quizChoicesArea.innerHTML = ''; 
+            
+            let choices;
+            if (reuseStoredChoices && deckState.currentQuizItemId === currentItem.id && deckState.currentQuizChoices.length > 0) {
+                choices = [...deckState.currentQuizChoices];
+                console.log("[renderQuizChoices] Reusing stored choices for item", currentItem.id, ":", choices);
+            } else {
+                const correctAnswerLang = appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th;
+                choices = [correctAnswerLang];
+                const distractors = appState.masterDeck.filter(item => item.id !== currentItem.id)
+                    .map(item => appState.quizTranslationLanguage === 'en' ? item.en : item.th)
+                    .filter((value, index, self) => value && self.indexOf(value) === index && value !== correctAnswerLang); 
+                shuffleArray(distractors);
+                choices = choices.concat(distractors.slice(0, Math.min(3, distractors.length))); 
+                shuffleArray(choices); 
+                deckState.currentQuizChoices = [...choices]; 
+                deckState.currentQuizItemId = currentItem.id; 
+                console.log("[renderQuizChoices] Generated and stored new choices for item", currentItem.id, ":", choices);
+            }
+
+            choices.forEach(choiceText => {
+                const choiceButton = document.createElement('button');
+                choiceButton.className = 'btn btn-theme-outline w-full text-left p-3 quiz-choice';
+                choiceButton.textContent = choiceText;
+                choiceButton.onclick = () => handleQuizAnswer(choiceText === (appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th), choiceButton, (appState.quizTranslationLanguage === 'en' ? currentItem.en : currentItem.th));
+                el.quizChoicesArea.appendChild(choiceButton);
+            });
+        };
         const handleQuizAnswer = (isCorrect, clickedButton, correctAnswerText) => { 
             console.log("[handleQuizAnswer] Called. isCorrect:", isCorrect, "Button text:", clickedButton.textContent);
             const deckState = getDeckState();
@@ -638,37 +1096,460 @@
                  updateDisplay(); 
             }
         };
-        const goToNextItem = () => { /* ... same ... */ };
-        const goToPrevItem = () => { /* ... same ... */ };
+        const goToNextItem = () => { 
+            if (appState.isLoading) return;
+            const deckState = getDeckState();
+            if (deckState.currentIndex < appState.currentDeck.length - 1) {
+                deckState.currentIndex++; 
+            } else if (appState.currentDeck.length > 0) { 
+                showMessage("You've reached the end of the deck!", "info"); return; 
+            } else { return; } 
+            appState.isFlashcardFlipped = false; 
+            deckState.quizAnsweredCurrent = false; 
+            deckState.currentQuizChoices = []; 
+            deckState.currentQuizItemId = null;
+            updateDisplay();
+        };
+        const goToPrevItem = () => { 
+            if (appState.isLoading) return;
+            const deckState = getDeckState();
+            if (deckState.currentIndex > 0) {
+                deckState.currentIndex--;
+                appState.isFlashcardFlipped = false;
+                deckState.quizAnsweredCurrent = false;
+                deckState.currentQuizChoices = []; 
+                deckState.currentQuizItemId = null;
+                updateDisplay();
+            }
+        };
         
         // --- DOM Element Setup ---
-        const setupDOMReferences = () => { /* ... same ... */ };
+        const setupDOMReferences = () => { 
+            console.log("Setting up DOM references...");
+            el.authArea = document.getElementById('authArea');
+            el.appArea = document.getElementById('appArea');
+            el.deckActionsArea = document.getElementById('deckActionsArea');
+            el.footerArea = document.getElementById('footerArea');
+            el.loginForm = document.getElementById('loginForm');
+            el.signupForm = document.getElementById('signupForm');
+            el.loginEmail = document.getElementById('loginEmail');
+            el.loginPassword = document.getElementById('loginPassword');
+            el.signupEmail = document.getElementById('signupEmail');
+            el.signupPassword = document.getElementById('signupPassword');
+            el.showSignupBtn = document.getElementById('showSignupBtn');
+            el.showLoginBtn = document.getElementById('showLoginBtn');
+            el.logoutBtn = document.getElementById('logoutBtn');
+            el.authStatus = document.getElementById('authStatus');
+            el.loginFormContainer = document.getElementById('loginFormContainer');
+            el.signupFormContainer = document.getElementById('signupFormContainer');
+            el.anonymousLoginBtn = document.getElementById('anonymousLoginBtn'); 
+            el.languageToggleBtn = document.getElementById('languageToggleBtn'); 
+            el.deckWordsBtn = document.getElementById('deckWordsBtn');
+            el.deckSentencesBtn = document.getElementById('deckSentencesBtn');
+            el.modeFlashcardBtn = document.getElementById('modeFlashcardBtn');
+            el.modeQuizBtn = document.getElementById('modeQuizBtn');
+            el.charSimplifiedBtn = document.getElementById('charSimplifiedBtn');
+            el.charTraditionalBtn = document.getElementById('charTraditionalBtn');
+            el.pinyinToggleFlashcard = document.getElementById('pinyinToggleFlashcard');
+            el.pinyinToggleQuiz = document.getElementById('pinyinToggleQuiz');
+            el.quizTranslationToggleContainer = document.getElementById('quizTranslationToggleContainer');
+            el.transEnBtn = document.getElementById('transEnBtn');
+            el.transThBtn = document.getElementById('transThBtn');
+            el.deckAllBtn = document.getElementById('deckAllBtn');
+            el.deckReviewBtn = document.getElementById('deckReviewBtn');
+            el.deckUnlearnedBtn = document.getElementById('deckUnlearnedBtn');
+            el.reviewDeckCount = document.getElementById('reviewDeckCount');
+            el.learnedDeckCount = document.getElementById('learnedDeckCount');
+            el.autoAdvanceToggle = document.getElementById('autoAdvanceToggle');
+            el.autoAdvanceToggleKnob = document.getElementById('autoAdvanceToggleKnob');
+            el.shuffleDeckBtn = document.getElementById('shuffleDeckBtn');
+            el.resetProgressBtn = document.getElementById('resetProgressBtn');
+            el.flashcardModeDiv = document.getElementById('flashcardMode');
+            el.quizModeDiv = document.getElementById('quizMode');
+            el.flashcard = document.getElementById('flashcard');
+            el.flashcardInner = document.querySelector('#flashcard .flip-card-inner'); 
+            el.flashcardFront = document.getElementById('flashcardFront');
+            el.flashcardChar = document.getElementById('flashcardChar');
+            el.flashcardPinyin = document.getElementById('flashcardPinyin');
+            el.flashcardBack = document.getElementById('flashcardBack');
+            el.flashcardEn = document.getElementById('flashcardEn');
+            el.flashcardTh = document.getElementById('flashcardTh');
+            el.flashcardPinyinBack = document.getElementById('flashcardPinyinBack');
+            el.flashcardFeedbackButtons = document.getElementById('flashcardFeedbackButtons'); 
+            el.reviewAgainBtn = document.getElementById('reviewAgainBtn');
+            el.rememberBtn = document.getElementById('rememberBtn');
+            el.quizQuestionArea = document.getElementById('quizQuestionArea');
+            el.quizChar = document.getElementById('quizChar');
+            el.quizPinyin = document.getElementById('quizPinyin');
+            el.quizChoicesArea = document.getElementById('quizChoicesArea');
+            el.quizFeedback = document.getElementById('quizFeedback');
+            el.navigationButtons = document.getElementById('navigationButtons');
+            el.prevBtn = document.getElementById('prevBtn');
+            el.nextBtn = document.getElementById('nextBtn');
+            el.progressText = document.getElementById('progressText');
+            el.progressBar = document.getElementById('progressBar');
+            el.accuracyDisplayContainer = document.getElementById('accuracyDisplayContainer');
+            el.accuracyText = document.getElementById('accuracyText');
+            el.accuracyBar = document.getElementById('accuracyBar');
+            el.messageBox = document.getElementById('messageBox');
+            el.toggleControlsBtn = document.getElementById('toggleControlsBtn');
+            el.controlPanel = document.getElementById('controlPanel'); 
+            console.log("DOM References setup complete.");
+        };
         // --- AUTHENTICATION EVENT LISTENERS AND FUNCTIONS ---
-        const setupAuthEventListeners = () => { /* ... same ... */ };
-        const updateUIForAuthState = (user) => { /* ... same ... */ };
+        const setupAuthEventListeners = () => { 
+            console.log("Setting up auth event listeners...");
+             if (el.loginForm) {
+                el.loginForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    console.log("Login form submitted.");
+                    if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                    try {
+                        await signInWithEmailAndPassword(auth, el.loginEmail.value, el.loginPassword.value);
+                        showMessage('Logged in successfully!', 'success');
+                    } catch (error) {
+                        showMessage(`Login failed: ${error.message}`, 'error');
+                        console.error("Login error:", error);
+                    }
+                });
+            } else { console.error("Login form (el.loginForm) not found in DOM.");}
+
+            if (el.signupForm) {
+                el.signupForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    console.log("Signup form submitted.");
+                    if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                    try {
+                        await createUserWithEmailAndPassword(auth, el.signupEmail.value, el.signupPassword.value);
+                        showMessage('Signed up successfully! You are now logged in.', 'success');
+                    } catch (error) {
+                        if (error.code === 'auth/operation-not-allowed') {
+                            showMessage('Signup failed: Email/Password sign-in is not enabled for this app. Please check Firebase console settings.', 'error', 7000);
+                            console.error("Signup error: auth/operation-not-allowed. This usually means Email/Password sign-in provider needs to be enabled in your Firebase project's Authentication settings.", error);
+                        } else if (error.code === 'auth/email-already-in-use') {
+                             showMessage('Signup failed: This email is already in use. Please try logging in.', 'error', 6000);
+                        } else {
+                            showMessage(`Signup failed: ${error.message}`, 'error');
+                            console.error("Signup error:", error);
+                        }
+                    }
+                });
+            } else { console.error("Signup form (el.signupForm) not found in DOM.");}
+
+            if (el.logoutBtn) {
+                el.logoutBtn.addEventListener('click', async () => {
+                    console.log("Logout button clicked.");
+                    if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                    try {
+                        await signOut(auth);
+                        showMessage('Logged out.', 'info');
+                    } catch (error) {
+                        showMessage(`Logout failed: ${error.message}`, 'error');
+                    }
+                });
+            } else { console.error("Logout button (el.logoutBtn) not found in DOM."); }
+
+            if (el.showSignupBtn) el.showSignupBtn.addEventListener('click', () => {
+                el.loginFormContainer.classList.add('hidden');
+                el.signupFormContainer.classList.remove('hidden');
+            }); else { console.error("Show Signup button not found");}
+
+            if (el.showLoginBtn) el.showLoginBtn.addEventListener('click', () => {
+                el.signupFormContainer.classList.add('hidden');
+                el.loginFormContainer.classList.remove('hidden');
+            }); else { console.error("Show Login button not found");}
+
+            if (el.anonymousLoginBtn) el.anonymousLoginBtn.addEventListener('click', async () => {
+                console.log("Anonymous login button clicked.");
+                if (!auth) { showMessage("Firebase Auth not initialized.", "error"); return; }
+                try {
+                    await signInAnonymously(auth);
+                    showMessage('Continuing as Guest. Progress will be saved locally.', 'info');
+                } catch (error) {
+                    showMessage(`Anonymous login failed: ${error.message}`, 'error');
+                    console.error("Anonymous login error:", error);
+                }
+            }); else { console.error("Anonymous login button not found");}
+            console.log("Auth event listeners setup complete.");
+        };
+        const updateUIForAuthState = (user) => { 
+            if (user) {
+                el.authArea.classList.add('hidden');
+                el.appArea.style.display = 'flex'; 
+                el.deckActionsArea.style.display = 'flex';
+                el.footerArea.style.display = 'block'; 
+                el.authStatus.textContent = user.isAnonymous ? uiStrings[appState.uiLanguage].authStatusGuest : uiStrings[appState.uiLanguage].authStatusLoggedInAs.replace("{email}", user.email);
+                el.logoutBtn.classList.remove('hidden');
+            } else {
+                el.authArea.classList.remove('hidden');
+                el.appArea.style.display = 'none';
+                el.deckActionsArea.style.display = 'none'; 
+                el.footerArea.style.display = 'none';
+                el.authStatus.textContent = uiStrings[appState.uiLanguage].authStatusNotLoggedIn;
+                el.logoutBtn.classList.add('hidden');
+                if(el.progressText) el.progressText.textContent = '0/0';
+                if(el.progressBar) el.progressBar.style.width = '0%';
+                if(el.accuracyText) el.accuracyText.textContent = 'N/A';
+                if(el.accuracyBar) el.accuracyBar.style.width = '0%';
+                if(el.reviewDeckCount) el.reviewDeckCount.textContent = uiStrings[appState.uiLanguage].reviewCountText.replace("{count}", 0);
+                if(el.learnedDeckCount) el.learnedDeckCount.textContent = uiStrings[appState.uiLanguage].learnedCountText.replace("{count}", 0);
+            }
+        };
         // --- APP EVENT LISTENERS ---
-        const setupAppEventListeners = () => { /* ... same ... */ };
+        const setupAppEventListeners = () => { 
+            console.log("Setting up app event listeners...");
+            el.languageToggleBtn.addEventListener('click', () => {
+                appState.uiLanguage = appState.uiLanguage === 'en' ? 'zh' : 'en';
+                updateDisplay(); 
+            });
+            el.deckWordsBtn.addEventListener('click', async () => {
+                if (appState.isLoading || appState.deckSource === 'words') return;
+                appState.deckSource = 'words';
+                getDeckState().currentQuizChoices = []; getDeckState().currentQuizItemId = null; 
+                await initializeDeck(); 
+            });
+            el.deckSentencesBtn.addEventListener('click', async () => {
+                if (appState.isLoading || appState.deckSource === 'sentences') return;
+                appState.deckSource = 'sentences';
+                getDeckState().currentQuizChoices = []; getDeckState().currentQuizItemId = null; 
+                await initializeDeck(); 
+            });
+            el.modeFlashcardBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.currentMode = 'flashcard'; appState.isFlashcardFlipped = false; updateDisplay();} });
+            el.modeQuizBtn.addEventListener('click', () => { 
+                if (!appState.isLoading) {
+                    appState.currentMode = 'quiz';
+                    const deckState = getDeckState();
+                    deckState.quizAnsweredCurrent = false; 
+                    deckState.currentQuizChoices = []; 
+                    deckState.currentQuizItemId = null;
+                    updateDisplay();
+                }
+            });
+            el.charSimplifiedBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.showSimplified = true; updateDisplay();} });
+            el.charTraditionalBtn.addEventListener('click', () => { if (!appState.isLoading) {appState.showSimplified = false; updateDisplay();} });
+            function handlePinyinToggle() {
+                if (appState.isLoading) return;
+                appState.showPinyin = !appState.showPinyin;
+                updatePinyinToggleButtonsState(); updateDisplay(); 
+            }
+            el.pinyinToggleFlashcard.addEventListener('click', handlePinyinToggle);
+            el.pinyinToggleQuiz.addEventListener('click', handlePinyinToggle);
+            el.transEnBtn.addEventListener('click', () => { 
+                if (!appState.isLoading) {
+                    appState.quizTranslationLanguage = 'en'; 
+                    const deckState = getDeckState();
+                    deckState.currentQuizChoices = []; deckState.currentQuizItemId = null; 
+                    deckState.quizAnsweredCurrent = false; 
+                    updateDisplay(); 
+                }
+            });
+            el.transThBtn.addEventListener('click', () => { 
+                if (!appState.isLoading) {
+                    appState.quizTranslationLanguage = 'th'; 
+                    const deckState = getDeckState();
+                    deckState.currentQuizChoices = []; deckState.currentQuizItemId = null; 
+                    deckState.quizAnsweredCurrent = false; 
+                    updateDisplay(); 
+                }
+            });
+            el.deckAllBtn.addEventListener('click', () => { if (!appState.isLoading && appState.deckViewType !== 'all') {appState.deckViewType = 'all'; getDeckState().currentIndex = 0; getDeckState().currentQuizChoices = []; getDeckState().currentQuizItemId = null; filterAndSetCurrentDeck(); updateDisplay();}});
+            el.deckReviewBtn.addEventListener('click', () => { if (!appState.isLoading && appState.deckViewType !== 'review') {appState.deckViewType = 'review'; getDeckState().currentIndex = 0; getDeckState().currentQuizChoices = []; getDeckState().currentQuizItemId = null; filterAndSetCurrentDeck(); updateDisplay();}});
+            el.deckUnlearnedBtn.addEventListener('click', () => { if (!appState.isLoading && appState.deckViewType !== 'unlearned') {appState.deckViewType = 'unlearned'; getDeckState().currentIndex = 0; getDeckState().currentQuizChoices = []; getDeckState().currentQuizItemId = null; filterAndSetCurrentDeck(); updateDisplay();}});
+            el.autoAdvanceToggle.addEventListener('click', () => { if (!appState.isLoading) {appState.autoAdvance = !appState.autoAdvance; updateFlashcardAnimation(); updateDisplay();}}); 
+            el.shuffleDeckBtn.addEventListener('click', () => {
+                if (appState.isLoading || appState.currentDeck.length === 0) return;
+                shuffleArray(appState.currentDeck); 
+                const deckState = getDeckState();
+                deckState.currentIndex = 0; appState.isFlashcardFlipped = false; 
+                deckState.quizAnsweredCurrent = false; deckState.currentQuizChoices = []; 
+                deckState.currentQuizItemId = null;
+                showMessage("Current deck view shuffled!", "success", 1500); updateDisplay();
+            });
+            el.resetProgressBtn.addEventListener('click', async () => {
+                if (appState.isLoading) return;
+                const currentLang = appState.uiLanguage;
+                const confirmMessage = appState.isAnonymousUser ? 
+                    (uiStrings[currentLang].confirmResetLocal || "Are you sure you want to reset all progress for this deck source? This will clear locally stored data.") :
+                    (uiStrings[currentLang].confirmResetAccount || "Are you sure you want to reset all progress for this deck source? This will clear data from your account for this deck.");
+                const userConfirmed = window.confirm(confirmMessage);
+                if (!userConfirmed) return;
+                await resetProgress(); 
+            });
+            el.flashcard.addEventListener('click', (e) => { 
+                if (appState.isLoading) return;
+                if (e.target.closest('#reviewAgainBtn') || e.target.closest('#rememberBtn') || e.target.closest('#pinyinToggleFlashcard')) return; 
+                if (appState.currentMode === 'flashcard' && appState.currentDeck.length > 0) flipCard();
+            });
+            el.reviewAgainBtn.addEventListener('click', () => handleFlashcardFeedback(false));
+            el.rememberBtn.addEventListener('click', () => handleFlashcardFeedback(true));
+            el.prevBtn.addEventListener('click', goToPrevItem);
+            el.nextBtn.addEventListener('click', goToNextItem);
+            document.addEventListener('keydown', (e) => { 
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || appState.isLoading) return; 
+                if (appState.autoAdvance && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ')) return; 
+                if (e.key === 'ArrowLeft') goToPrevItem();
+                else if (e.key === 'ArrowRight') goToNextItem();
+                else if (e.key === ' ' && appState.currentMode === 'flashcard') { e.preventDefault(); flipCard(); }
+            });
+            el.toggleControlsBtn.addEventListener('click', () => { appState.controlPanelOpen = !appState.controlPanelOpen; el.controlPanel.classList.toggle('open', appState.controlPanelOpen);});
+            function checkScreenSizeForControls() { 
+                if (window.innerWidth >= 768) { el.controlPanel.classList.add('open'); el.controlPanel.style.maxHeight = ''; } 
+                else { if (!appState.controlPanelOpen) el.controlPanel.classList.remove('open');}
+            }
+            window.addEventListener('resize', checkScreenSizeForControls);
+            checkScreenSizeForControls(); 
+            console.log("App event listeners setup complete.");
+        };
+
         // --- Internationalization Function ---
-        const updateUILanguage = () => { /* ... same ... */ };
+        const updateUILanguage = () => {
+            const lang = appState.uiLanguage;
+            const strings = uiStrings[lang];
+            document.querySelectorAll('[data-translate]').forEach(elem => {
+                const key = elem.dataset.translate;
+                if (strings[key]) {
+                    if (key === 'reviewCountText' || key === 'learnedCountText') {
+                        const count = key === 'reviewCountText' ? getDeckState().reviewIds.size : getDeckState().learnedIds.size;
+                        elem.textContent = strings[key].replace("{count}", count);
+                    } else if (key === 'progressLabel') {
+                        const deckState = getDeckState();
+                        const totalItems = appState.currentDeck.length;
+                        const reviewedItems = totalItems > 0 ? deckState.currentIndex + 1 : 0;
+                        elem.innerHTML = strings[key].replace("{reviewed}", reviewedItems).replace("{total}", totalItems);
+                    } else if (key === 'accuracyLabel') {
+                         const deckState = getDeckState();
+                         const accuracy = deckState.quizAttempts > 0 ? ((deckState.quizCorrect / deckState.quizAttempts) * 100) : 0;
+                         elem.innerHTML = strings[key].replace("{accuracy}", deckState.quizAttempts > 0 ? `${accuracy.toFixed(0)}%` : 'N/A');
+                    } else if (key.startsWith('authStatus')) {
+                        if (appState.currentUser) {
+                             elem.textContent = appState.currentUser.isAnonymous ? strings.authStatusGuest : strings.authStatusLoggedInAs.replace("{email}", appState.currentUser.email);
+                        } else {
+                             elem.textContent = strings.authStatusNotLoggedIn;
+                        }
+                    }
+                    else {
+                        const textNode = Array.from(elem.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
+                        if (textNode) {
+                            textNode.textContent = strings[key];
+                        } else if (elem.querySelector('span[data-translate-inner]')) { 
+                            elem.querySelector('span[data-translate-inner]').textContent = strings[key];
+                        }
+                         else {
+                             elem.textContent = strings[key]; 
+                        }
+                    }
+                }
+            });
+            updatePinyinToggleButtonsState();
+            el.languageToggleBtn.textContent = appState.uiLanguage === 'en' ? "中文" : "EN";
+        };
+
 
         // --- APP START ---
-        const startApp = async () => { /* ... same ... */ };
-        
-        // --- Full function definitions (restored from previous versions) ---
-        // (All previously summarized functions are now fully defined as in v1.11 - Full Functions Restored)
-        // This includes: setupDOMReferences, setupAuthEventListeners, updateUIForAuthState, 
-        // setupAppEventListeners, updateUILanguage, initializeDeck, setLoadingState, 
-        // filterAndSetCurrentDeck, updateFlashcardAnimation, updateDisplay, updateToggleButtonStates, 
-        // updatePinyinToggleButtonsState, updateModeVisibility, updateNavigationButtons, 
-        // updateProgressAndAccuracy, updateStatusCounts, flipCard, handleFlashcardFeedback, 
-        // renderQuizChoices (already updated above), handleQuizAnswer (updated above), goToNextItem, goToPrevItem.
+        const startApp = async () => {
+            console.log("App starting (v1.12 - Enhanced Debugging)...");
+            try {
+                setupDOMReferences(); 
+                console.log("DOM References setup complete.");
 
-        // Ensure all function definitions from v1.11 are present here.
-        // The self-correction identified that these were missing and caused the ReferenceError.
-        // (The full code for these functions is lengthy but would be inserted here from the previous complete version)
+                let userProvidedConfig = { 
+                    apiKey: "AIzaSyA2AfVGf9BeQ0EH2_dPMyDyW17PTDnIzhw",
+                    authDomain: "lingualflow-eecd2.firebaseapp.com",
+                    projectId: "lingualflow-eecd2",
+                    storageBucket: "lingualflow-eecd2.appspot.com",
+                    messagingSenderId: "337589259202",
+                    appId: "1:337589259202:web:a21e6fbd67f1b34c3fe45b",
+                    measurementId: "G-3DCPWXRZG3"
+                };
 
+                if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config.trim() !== "") {
+                    try {
+                        currentFirebaseConfig = JSON.parse(__firebase_config);
+                        if (!currentFirebaseConfig.apiKey || !currentFirebaseConfig.projectId) {
+                            throw new Error("Firebase config from __firebase_config is missing essential fields.");
+                        }
+                        currentAppId = currentFirebaseConfig.appId || (typeof __app_id !== 'undefined' ? __app_id : 'hanziflow-from-env');
+                    } catch (e) {
+                        console.error("Error parsing __firebase_config:", e, ". Falling back to user-provided config.");
+                        currentFirebaseConfig = userProvidedConfig;
+                        currentAppId = currentFirebaseConfig.appId || 'hanziflow-user-config';
+                        showMessage("Using manually set Firebase config due to environment config error.", "info");
+                    }
+                } else { 
+                    currentFirebaseConfig = userProvidedConfig;
+                    currentAppId = currentFirebaseConfig.appId || 'hanziflow-user-config';
+                    console.warn("Using manually set Firebase config as __firebase_config is not defined.");
+                }
+                
+                console.log("Attempting Firebase initialization with config:", currentFirebaseConfig);
+                firebaseApp = initializeApp(currentFirebaseConfig);
+                auth = getAuth(firebaseApp);
+                db = getFirestore(firebaseApp);
+                console.log("Firebase Initialized. Project ID:", currentFirebaseConfig.projectId, "App ID for Firestore:", currentAppId);
+                console.log("Auth object after init:", auth);
+                console.log("DB object after init:", db);
+
+
+                setupAuthEventListeners(); 
+                console.log("Auth event listeners set up.");
+                setupAppEventListeners(); 
+                console.log("App event listeners set up.");
+                updateFlashcardAnimation(); 
+                console.log("Initial flashcard animation state set.");
+
+
+                if (!auth || !db) { 
+                     showMessage("Firebase services not available. Cannot proceed.", "error", 10000);
+                     updateUIForAuthState(null); 
+                     return;
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    console.log("[onAuthStateChanged] Triggered. User:", user ? user.uid : 'null', "Is Anonymous:", user ? user.isAnonymous : 'N/A');
+                    appState.currentUser = user;
+                    if (user) {
+                        appState.isAnonymousUser = user.isAnonymous;
+                        appState.userId = user.uid; 
+                    } else {
+                        appState.isAnonymousUser = false; 
+                        appState.userId = null;
+                    }
+                    updateUIForAuthState(user); 
+                    await loadProgress();      
+                    await initializeDeck();    
+                });
+                
+                if (currentFirebaseConfig.apiKey === "YOUR_API_KEY_HERE" || currentFirebaseConfig.projectId === "YOUR_PROJECT_ID") {
+                    updateUIForAuthState(null); 
+                    showMessage("Firebase is not configured with your project details. Please update the firebaseConfig in the script.", "error", 15000);
+                    return; 
+                }
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && auth) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                        console.log("Signed in with custom token.");
+                    } catch (error) {
+                        console.error("Error signing in with custom token:", error);
+                    }
+                } else if (auth && !auth.currentUser) { 
+                    console.log("No initial auth token and no current user. User needs to login/signup or continue as guest.");
+                }
+            } catch (error) {
+                console.error("CRITICAL ERROR in startApp:", error);
+                showMessage("A critical error occurred during app startup. Please check the console.", "error", 30000);
+                // Attempt to show auth area if app area setup failed
+                if (el.authArea && el.appArea) {
+                    el.authArea.classList.remove('hidden');
+                    el.appArea.style.display = 'none';
+                    el.deckActionsArea.style.display = 'none';
+                    el.footerArea.style.display = 'none';
+                }
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', startApp);
     </script>
 </body>
 </html>
+
